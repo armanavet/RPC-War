@@ -134,6 +134,19 @@ input[type=checkbox]{width:16px;height:16px;accent-color:var(--blue)}
   border-radius:999px;padding:3px 10px;font-size:12.5px;margin-right:6px}
 .chip .d{width:8px;height:8px;border-radius:50%}
 .chip .d.b{background:var(--blue)}.chip .d.r{background:var(--red)}
+.chatlog{max-height:190px;overflow:auto;display:flex;flex-direction:column;gap:5px;margin-bottom:9px;
+  font-size:13px;padding-right:2px}
+.chatlog:empty::after{content:"No messages yet.";color:#5b6a80;font-size:12.5px}
+.msg{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:6px 9px;
+  align-self:flex-start;max-width:92%;word-wrap:break-word;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:#1c2a44;border-color:#26436f}
+.msg .who{font-weight:700;font-size:11.5px;display:block;margin-bottom:1px}
+.msg .who.b{color:#7cb0ff} .msg .who.r{color:#ff8fa0}
+.msg.pending{opacity:.55}
+.chatrow{display:flex;gap:6px}
+.chatrow input{flex:1;min-width:0;font:inherit;font-size:13.5px;color:var(--txt);background:#0f141d;
+  border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.chatrow input:disabled{opacity:.5}
 .modal{position:fixed;inset:0;background:rgba(6,9,14,.78);backdrop-filter:blur(4px);z-index:50;
   display:none;align-items:center;justify-content:center;padding:20px}
 .modal.on{display:flex}
@@ -242,6 +255,15 @@ footer{margin-top:24px;color:#5b6a80;font-size:12px;text-align:center}
         </div>
       </div>
       <div class="err" id="mpErr" style="display:none"></div>
+    </div>
+
+    <div class="card" id="cardChat" style="display:none">
+      <h2>Chat</h2>
+      <div class="chatlog" id="chatLog"></div>
+      <div class="chatrow">
+        <input id="chatIn" maxlength="200" placeholder="Say something…" autocomplete="off">
+        <button onclick="sendChat()">Send</button>
+      </div>
     </div>
 
     <div class="card">
@@ -718,6 +740,9 @@ const FireT = {
   async setGuest(code,name){ await this._req(code+'/guest','PUT',name); },
   async push(code,i,mv){ await this._req(code+'/moves/'+i,'PUT',mv); },
   async clearMoves(code){ await this._req(code+'/moves','PUT',null); },  // PUT null deletes the node
+  // POST lets the server pick a unique, time-ordered key, so two people typing at
+  // the same moment can't overwrite each other
+  async postChat(code,msg){ await this._req(code+'/chat','POST',msg); },
   // turn-based game: polling a couple of times a second is plenty and stays inside the free tier
   watch(code,cb){
     let stop=false,lastJson='',id=null;
@@ -730,7 +755,7 @@ const FireT = {
       }catch(e){ /* transient network hiccup: just try again next tick */ }
       // check often while waiting on them, rarely while waiting on us
       const waitingOnThem = !net.ready || !!over || (net.on && turn!==net.side);
-      if(!stop) id=setTimeout(tick, waitingOnThem?700:2500);
+      if(!stop) id=setTimeout(tick, waitingOnThem?700:1000);
     };
     tick();
     return ()=>{ stop=true; clearTimeout(id); };
@@ -749,6 +774,9 @@ const MockT = {
   async setGuest(code,name){ const r=this._read(code); r.guest=name; this._write(code,r); },
   async push(code,i,mv){ const r=this._read(code); r.moves=r.moves||{}; r.moves[i]=mv; this._write(code,r); },
   async clearMoves(code){ const r=this._read(code); r.moves={}; this._write(code,r); },
+  async postChat(code,msg){ const r=this._read(code); r.chat=r.chat||{};
+    r.chat[String(Date.now())+'-'+String(this._seq=(this._seq||0)+1).padStart(4,'0')]=msg;
+    this._write(code,r); },
   watch(code,cb){
     const h=e=>{ if(e.data&&e.data.c===code) cb(e.data.v); };
     this._bc.addEventListener('message',h);
@@ -823,7 +851,7 @@ function enterNet(code,side,myName){
 function mpLeave(){
   if(net.unwatch){ try{net.unwatch()}catch(e){} }
   net.on=false; net.code=null; net.ready=false; net.names=['','']; net.unwatch=null;
-  flip=false; moveList=[];
+  flip=false; moveList=[]; chatServer={}; chatPending=[]; renderChat();
   history.replaceState(null,'',location.pathname+location.search);
   mpErr(''); newGame(); updateMpUI();
 }
@@ -847,8 +875,42 @@ function onRoom(room){
   const prefixOk = rm.length>=moveList.length && moveList.every((m,i)=>rm[i]===m);
   if(!prefixOk){ hardReset(); for(const mv of rm) doMove(mv,true); }
   else for(let k=moveList.length;k<rm.length;k++) doMove(rm[k],true);
+  applyChat(room.chat);
   updateMpUI(); render();
 }
+
+/* --- chat --- */
+let chatServer={}, chatPending=[];
+function applyChat(chat){
+  chatServer=chat||{};
+  // drop optimistic messages once the server echoes them back (count-matched,
+  // so sending the same text twice doesn't make one vanish early)
+  const seen={};
+  Object.values(chatServer).forEach(m=>{const k=m.s+'|'+m.t; seen[k]=(seen[k]||0)+1;});
+  chatPending=chatPending.filter(m=>{const k=m.s+'|'+m.t; if(seen[k]>0){seen[k]--;return false;} return true;});
+  renderChat();
+}
+function renderChat(){
+  const box=$('chatLog'); if(!box) return;
+  const sent=Object.keys(chatServer).sort().map(k=>chatServer[k]);
+  const all=sent.concat(chatPending.map(m=>({...m,pending:true}))).slice(-50);
+  box.innerHTML=all.map(m=>
+    '<div class="msg'+(m.s===net.side?' me':'')+(m.pending?' pending':'')+'">'+
+    '<span class="who '+(m.s===BLUE?'b':'r')+'">'+esc(m.n||'?')+'</span>'+esc(m.t)+'</div>').join('');
+  box.scrollTop=box.scrollHeight;
+}
+function sendChat(){
+  const inp=$('chatIn'); const t=inp.value.trim().slice(0,200);
+  if(!t||!net.on||!net.ready) return;
+  inp.value='';
+  const msg={n:net.names[net.side]||'?',s:net.side,t};
+  chatPending.push(msg); renderChat();
+  T.postChat(net.code,msg).catch(e=>{
+    chatPending=chatPending.filter(m=>m!==msg); renderChat();
+    mpErr('Message not sent: '+(e.message||e));
+  });
+}
+document.getElementById('chatIn').addEventListener('keydown',e=>{ if(e.key==='Enter') sendChat(); });
 
 function updateMpUI(){
   const online=net.on;
@@ -856,6 +918,9 @@ function updateMpUI(){
   $('mpIdle').style.display   = online?'none':'';
   $('mpLobby').style.display  = (online&&!net.ready)?'':'none';
   $('mpLive').style.display   = (online&&net.ready)?'':'none';
+  $('cardChat').style.display = online?'':'none';
+  $('chatIn').disabled        = !net.ready;
+  $('chatIn').placeholder     = net.ready?'Say something…':'Waiting for your friend…';
   if(online&&net.ready){
     const me=net.side, you=1-me;
     $('mpVs').innerHTML =
