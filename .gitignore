@@ -1,0 +1,7 @@
+# Supabase CLI scratch — machine-local, not project state
+supabase/.temp/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp

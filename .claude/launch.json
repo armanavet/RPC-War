@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "oddboard",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/serve.py", "8001"],
+      "port": 8001
+    }
+  ]
+}

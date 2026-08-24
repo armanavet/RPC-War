@@ -1,0 +1,35 @@
+/* ============================================================
+   Player page: the identity block and the match history table.
+   ============================================================ */
+.pstats{
+  display:grid;grid-template-columns:repeat(4,minmax(64px,1fr));
+  gap:1px;margin:0 0 0 auto;
+  background:var(--line);border:1px solid var(--line);
+  border-radius:var(--r-sm);overflow:hidden;
+}
+.pstats .stat{background:var(--surface-2);padding:8px 12px;text-align:right}
+.pstats dt{font-size:10.5px;color:var(--text-3);letter-spacing:.06em;text-transform:uppercase}
+.pstats dd{margin:2px 0 0;font-size:17px;font-weight:650}
+
+.tag{
+  display:inline-block;min-width:48px;text-align:center;
+  padding:2px 8px;border-radius:var(--r-xs);
+  font-size:12px;font-weight:600;
+  border:1px solid var(--line-2);color:var(--text-2);
+}
+.tag--win{color:var(--good);border-color:var(--accent-ring);background:var(--accent-tint)}
+.tag--loss{color:var(--bad);border-color:rgba(199,70,47,.3);background:var(--red-tint)}
+.tag--draw{color:var(--text-2)}
+.tag--void{color:var(--text-3)}
+
+.hist__opp{font-weight:600;text-decoration:underline;text-underline-offset:2px;
+  text-decoration-color:var(--line-2)}
+.hist__opp:hover{text-decoration-color:var(--accent)}
+.hist .is-up{color:var(--good)}
+.hist .is-down{color:var(--bad)}
+
+@media (max-width:720px){
+  .me{flex-wrap:wrap}
+  .pstats{margin:12px 0 0;width:100%}
+  .pstats .stat{text-align:left}
+}

@@ -1,0 +1,135 @@
+/* ============================================================
+   The computer player: a negamax search with alpha-beta pruning,
+   iterative deepening and a time budget so "Hard" stays responsive.
+   Depends only on the rules, never on the live game or the DOM.
+   ============================================================ */
+import {SZ, BLUE, RED, DIRS, col, typ, rowOf, colOf, goalRow, beats,
+        genMoves, outcome, apply, count, moveFrom, moveTo} from './rules.js';
+
+const WIN = 1e6;
+const ABORT = {};
+let _nodes = 0;
+let _deadline = Infinity;
+
+/* The computer is never allowed to walk into a fight it loses.
+   (Humans still can — the move is legal, just marked with a red X.) */
+function genAIMoves(board, c){
+  const all = genMoves(board, c);
+  const safe = all.filter(mv => outcome(board, moveFrom(mv), moveTo(mv)) !== 'lose');
+  return safe.length ? safe : all;
+}
+
+/* Positive = good for blue. */
+function evalBlue(board){
+  let s = 0;
+  for(let i = 0; i < SZ; i++){
+    const p = board[i]; if(!p) continue;
+    const c = col(p), t = typ(p), r = rowOf(i), cc = colOf(i);
+    const prog = c === BLUE ? 8 - r : r;
+    let v = 110 + prog * 3 + prog * prog * 0.9;
+    // small centre pull so pieces don't hug the walls
+    v += (4 - Math.abs(4 - cc)) * 0.6;
+    // local threat map
+    for(const d of DIRS){
+      const nr = r + d[0], nc = cc + d[1];
+      if(nr < 0 || nr > 8 || nc < 0 || nc > 8) continue;
+      const q = board[nr * 9 + nc]; if(!q || col(q) === c) continue;
+      const qt = typ(q);
+      if(beats(qt, t)) v -= 9; else if(beats(t, qt)) v += 5;
+    }
+    s += c === BLUE ? v : -v;
+  }
+  return s;
+}
+
+/* Search the good-looking moves first so alpha-beta cuts more. */
+function order(board, moves, c){
+  const sc = new Array(moves.length);
+  for(let k = 0; k < moves.length; k++){
+    const mv = moves[k], from = moveFrom(mv), to = moveTo(mv);
+    const o = outcome(board, from, to);
+    let v = o === 'win' ? 900 : o === 'trade' ? 120 : o === 'lose' ? -500 : 0;
+    const pr = c === BLUE ? rowOf(from) - rowOf(to) : rowOf(to) - rowOf(from);
+    v += pr * 40;
+    if(rowOf(to) === goalRow(c)) v += 100000;
+    sc[k] = v;
+  }
+  return moves.map((m, k) => [sc[k], m]).sort((a, b) => b[0] - a[0]).map(x => x[1]);
+}
+
+/* Piece counts after a move, from the side-to-move's point of view. */
+function tally(o, myN, opN){
+  if(o === 'win') opN--;
+  else if(o === 'lose') myN--;
+  else if(o === 'trade'){ myN--; opN--; }
+  return [myN, opN];
+}
+
+/* Score one move for side c. `recurse` continues the search, or is null at
+   the leaves. Terminal positions short-circuit before any recursion. */
+function scoreMove(board, c, res, depth, myN, opN, recurse){
+  const landed = (res.o === 'move' || res.o === 'win');
+  if(landed && rowOf(res.to) === goalRow(c)) return WIN + depth;
+  if(myN === 0 && opN === 0) return 0;
+  if(opN === 0) return WIN + depth;
+  if(myN === 0) return -(WIN + depth);
+  if(depth <= 1) return (c === BLUE ? 1 : -1) * evalBlue(res.bd);
+  return recurse();
+}
+
+function negamax(board, c, depth, alpha, beta, blueN, redN){
+  if((++_nodes & 511) === 0 && Date.now() > _deadline) throw ABORT;
+  const moves = order(board, genAIMoves(board, c), c);
+  if(!moves.length) return -WIN / 2;
+  let best = -Infinity;
+  for(const mv of moves){
+    const res = apply(board, mv);
+    const [myN, opN] = tally(res.o, c === BLUE ? blueN : redN, c === BLUE ? redN : blueN);
+    const s = scoreMove(board, c, res, depth, myN, opN, () =>
+      -negamax(res.bd, 1 - c, depth - 1, -beta, -alpha,
+               c === BLUE ? myN : opN, c === BLUE ? opN : myN));
+    if(s > best) best = s;
+    if(best > alpha) alpha = best;
+    if(alpha >= beta) break;
+  }
+  return best;
+}
+
+export function bestMove(board, c, depth, sloppy){
+  const blueN = count(board, BLUE), redN = count(board, RED);
+  let ms = genAIMoves(board, c);
+  if(!ms.length) return null;
+  // shuffle first so equal-value moves are picked without positional bias
+  for(let i = ms.length - 1; i > 0; i--){ const j = (Math.random() * (i + 1)) | 0; [ms[i], ms[j]] = [ms[j], ms[i]]; }
+  if(sloppy && Math.random() < 0.25) return ms[0];
+  ms = order(board, ms, c);
+
+  let best = -Infinity, cand = [], alpha = -Infinity;
+  for(const mv of ms){
+    const res = apply(board, mv);
+    const [myN, opN] = tally(res.o, c === BLUE ? blueN : redN, c === BLUE ? redN : blueN);
+    const s = scoreMove(board, c, res, depth, myN, opN, () =>
+      -negamax(res.bd, 1 - c, depth - 1, -Infinity, -alpha,
+               c === BLUE ? myN : opN, c === BLUE ? opN : myN));
+    if(s > best + 1e-9){ best = s; cand = [mv]; alpha = Math.max(alpha, s); }
+    else if(s > best - 1e-9) cand.push(mv);
+  }
+  return cand[(Math.random() * cand.length) | 0];
+}
+
+/* Iterative deepening under a time budget. */
+export function bestMoveTimed(board, c, maxDepth, budgetMs, sloppy){
+  let best = null;
+  _nodes = 0; _deadline = Date.now() + budgetMs;
+  try{
+    for(let d = 2; d <= maxDepth; d++){
+      const m = bestMove(board, c, d, sloppy);
+      if(m != null) best = m;
+      if(Date.now() > _deadline) break;
+    }
+  }catch(e){
+    if(e !== ABORT){ _deadline = Infinity; throw e; }
+  }
+  _deadline = Infinity;
+  return best != null ? best : bestMove(board, c, 2, sloppy);
+}

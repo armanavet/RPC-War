@@ -1,0 +1,63 @@
+/* ============================================================
+   Homepage: a profile strip and the game grid. That is all it is.
+   ============================================================ */
+
+/* ---------- profile strip ---------- */
+.me{
+  display:flex;align-items:center;gap:14px;
+  padding:16px 18px;
+  margin:26px 0 34px;
+}
+.me__who{min-width:0;flex:1}
+.me__name{font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.me__line{font-size:13.5px}
+.me .btn{flex:none}
+
+/* ---------- games ---------- */
+.h-games{font-size:19px;margin-bottom:14px}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px;
+}
+
+.gcard{
+  display:flex;flex-direction:column;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+  transition:border-color var(--fast),box-shadow var(--fast);
+}
+a.gcard:hover{border-color:var(--line-2);box-shadow:var(--shadow-md)}
+
+
+.gcard__art{
+  padding:16px 18px 12px;
+  background:var(--surface-2);
+  border-bottom:1px solid var(--line);
+}
+.gcard__art svg{width:100%;height:auto;max-width:200px;margin:0 auto}
+
+.gcard__bd{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
+.gcard__top{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+.gcard__title{font-size:16px;flex:1}
+.gcard__blurb{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
+
+.gcard__foot{
+  display:flex;align-items:center;gap:10px;
+  margin-top:14px;
+}
+.gcard__tags{
+  display:flex;gap:10px;
+  list-style:none;margin:0;padding:0;
+  font-size:12.5px;color:var(--text-3);
+}
+.gcard__foot .btn{margin-left:auto}
+
+/* ---------- narrow screens ---------- */
+@media (max-width:560px){
+  .wrap{padding:0 16px}
+  .me{margin:18px 0 26px;padding:14px}
+}

@@ -1,0 +1,114 @@
+/* ============================================================
+   Design tokens. Everything visual resolves to these.
+
+   Light by default, dark when the reader's system asks for it.
+   Neutral greys, one accent (green — it has to stay out of the way
+   of the blue and red players), system fonts, no decoration.
+   ============================================================ */
+:root{
+  /* --- surfaces --- */
+  --page:       #F6F7F9;
+  --surface:    #FFFFFF;
+  --surface-2:  #F1F3F5;   /* insets, inputs */
+  --surface-3:  #E6E9ED;   /* hover */
+  --line:       #E3E6EA;
+  --line-2:     #CBD1D8;
+
+  /* --- text --- */
+  --text:       #1C2024;
+  --text-2:     #5C666F;
+  --text-3:     #8B949E;
+
+  /* --- accent --- */
+  --accent:      #1E7A4A;
+  --accent-hover:#17603B;
+  --accent-fg:   #FFFFFF;
+  --accent-tint: rgba(30,122,74,.10);
+  --accent-ring: rgba(30,122,74,.35);
+
+  /* --- the two sides. `-hi` is whichever shade stays legible
+         against the page, so it flips between themes. --- */
+  --blue:      #3B6FC4;
+  --blue-hi:   #2C568F;
+  --blue-tint: rgba(59,111,196,.13);
+  --red:       #C7462F;
+  --red-hi:    #A33724;
+  --red-tint:  rgba(199,70,47,.13);
+
+  /* --- board --- */
+  --board-lite: #E9EDF2;
+  --board-dark: #BCC6D2;
+
+  /* --- fight outcomes --- */
+  --good: #1E7A4A;
+  --even: #8F6519;
+  --bad:  #C7462F;
+
+  /* --- type: whatever the reader's OS already uses --- */
+  --font-ui:   system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* --- shape --- */
+  --r-xs: 3px;
+  --r-sm: 6px;
+  --r:    8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* --- depth: used sparingly --- */
+  --shadow:    0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --shadow-md: 0 4px 12px rgba(16,24,40,.10);
+  --shadow-lg: 0 12px 32px rgba(16,24,40,.16);
+
+  /* --- motion --- */
+  --ease: cubic-bezier(.2,.7,.3,1);
+  --fast: .12s var(--ease);
+  --med:  .2s var(--ease);
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --page:       #15181C;
+    --surface:    #1D2126;
+    --surface-2:  #23282E;
+    --surface-3:  #2C323A;
+    --line:       #2C3238;
+    --line-2:     #3C444D;
+
+    --text:       #E7EAEE;
+    --text-2:     #A2ACB6;
+    --text-3:     #79838E;
+
+    --accent:      #3FA972;
+    --accent-hover:#4CBB81;
+    --accent-fg:   #0E1512;
+    --accent-tint: rgba(63,169,114,.14);
+    --accent-ring: rgba(63,169,114,.4);
+
+    --blue:      #4A7FD4;
+    --blue-hi:   #8AB0EC;
+    --blue-tint: rgba(74,127,212,.18);
+    --red:       #D65A41;
+    --red-hi:    #EE9077;
+    --red-tint:  rgba(214,90,65,.18);
+
+    --board-lite: #495663;
+    --board-dark: #3A444F;
+
+    --good: #3FA972;
+    --even: #D2A03F;
+    --bad:  #E0664C;
+
+    --shadow:    0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.25);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.35);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
