@@ -228,7 +228,9 @@ function onMatch(m, presence){
   // over but the row is still live, ask it to check for itself.
   if(game.over && m.state === 'live' && !finishing){
     finishing = true;
-    T.finish(m.id).catch(e => fail(e));
+    // Let go of the latch on failure, or one dropped request strands the
+    // match as `live` for good — the safety poll re-enters here and retries.
+    T.finish(m.id).catch(e => { finishing = false; fail(e); });
   }
   // a result the server reached without us (resignation, or their client
   // got there first) still has to end the game on this screen
