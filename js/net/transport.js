@@ -65,7 +65,20 @@ const SupaT = {
       body: {matchId},
       headers: session ? {Authorization: 'Bearer ' + session.access_token} : {},
     });
-    if(error) throw new Error(error.message);
+    /* supabase-js reports every non-2xx as the same sentence and hides the
+       function's own message on error.context, which is the unread Response.
+       Unwrap it, or a 409 and a 500 are indistinguishable on screen. */
+    if(error){
+      const res = error.context;
+      if(res && typeof res.text === 'function'){
+        let body = '';
+        try{ body = await res.text(); }catch(e){}
+        let msg = body;
+        try{ msg = JSON.parse(body).error || body; }catch(e){}
+        throw new Error(`finish-match ${res.status}: ${msg || error.message}`);
+      }
+      throw new Error(error.message);
+    }
     return data;
   },
 
