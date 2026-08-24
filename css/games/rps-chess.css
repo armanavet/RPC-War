@@ -5,7 +5,7 @@
    ============================================================ */
 
 .game{padding:22px 0 0}
-.game__hd{margin-bottom:16px}
+.game__hd{margin-bottom:16px; display:flex; align-items:baseline; gap:10px}
 .game__title{font-size:22px}
 
 .game__layout{

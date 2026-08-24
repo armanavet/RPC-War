@@ -11,6 +11,7 @@ import * as ui from './ui.js';
 import * as mp from './sync.js';
 import * as profile from '../../site/profile.js';
 import {mountAuthBar} from '../../site/authbar.js';
+import {startPresence} from '../../net/presence.js';
 
 /* ---------- computer player ---------- */
 const aiEnabled = () => ui.$('aiOn').checked;
@@ -116,5 +117,15 @@ ui.$('aiOn').addEventListener('change', () => { if(!game.over) maybeAI(); });
 
 /* ---------- go ---------- */
 mountAuthBar();
+
+/* "3 here" — everyone on this screen, not just the two in this match.
+   Match presence is a different thing entirely and lives in sync.js. */
+startPresence('rps-chess', ({rooms}) => {
+  const n = (rooms && rooms['rps-chess']) || 0;
+  const el = ui.$('liveHere');
+  if(!el) return;
+  el.textContent = n === 1 ? '1 here' : `${n} here`;
+  el.hidden = !n;
+});
 newGame();
 mp.autoJoinFromHash();

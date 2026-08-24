@@ -1,0 +1,38 @@
+-- ============================================================
+-- The grant the server side never got.
+--
+-- `finish-match` reads the match row directly with the service
+-- role before replaying it. That read was failing with
+--
+--     permission denied for table matches
+--
+-- so no played-out game could ever be recorded: the function
+-- returned 500 before it reached record_result, and the row
+-- stayed `live` for good.
+--
+-- Why it was missing: this project runs with *automatically
+-- expose new tables* OFF, which removes the default privileges
+-- Supabase would otherwise hand anon, authenticated AND
+-- service_role on every new table in public. Migrations 0001-0008
+-- each spell out grants for anon and authenticated, and none of
+-- them mention service_role — so the server had nothing.
+--
+-- Note that service_role already has BYPASSRLS. That is the row
+-- gate, not the table gate; bypassing RLS does not grant a single
+-- table privilege. Both gates have to be open (see HANDOFF §5.4).
+--
+-- Nothing here widens what a browser can do. The service role key
+-- is server-only and never ships to a client; the publishable key
+-- in js/net/config.js does not carry these rights.
+--
+-- Apply after 0008_public_history.sql.
+-- ============================================================
+
+-- The only table the edge function touches directly. Everything
+-- else it does goes through record_result / void_match, which are
+-- security definer and run as their owner.
+grant select on public.matches to service_role;
+
+-- Writes stay closed even for the server: state and result are
+-- still reachable only through record_result and void_match, so
+-- there remains exactly one path by which a result gets written.

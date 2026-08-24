@@ -270,3 +270,29 @@ select.field{
 .modal__btns{display:flex;gap:8px}
 
 .err{margin-top:10px;font-size:13px;color:var(--bad)}
+
+/* ---------- live counts ----------
+   A quiet "3 playing". Deliberately understated: the dot carries the
+   "right now" and the number carries the rest, so nothing here
+   competes with the Play button next to it. */
+.live{
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--text-3); white-space:nowrap;
+}
+.live::before{
+  content:''; width:6px; height:6px; border-radius:var(--r-pill);
+  background:var(--accent); flex:none;
+  box-shadow:0 0 0 3px var(--accent-tint);
+}
+.live[hidden]{display:none}
+.live--total{font-size:13px}
+
+/* the pulse is easy to overdo — one slow breath, and none at all for
+   anyone who has asked the OS for less motion */
+@media (prefers-reduced-motion: no-preference){
+  .live::before{animation:livePulse 2.4s var(--ease) infinite}
+}
+@keyframes livePulse{
+  0%,100%{box-shadow:0 0 0 3px var(--accent-tint)}
+  50%    {box-shadow:0 0 0 5px transparent}
+}

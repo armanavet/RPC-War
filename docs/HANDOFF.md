@@ -24,33 +24,29 @@ Repo: `armanavet/RPC-War`. Branch `main`.
 | Accounts (Google, GitHub) | done, live |
 | Guest sessions (anonymous auth) | done, live |
 | Matches on Supabase + Realtime | done, live |
-| Result verification (edge function) | **written, not deployed** |
-| Elo | **written, migration 0004 applied, 0005+ not** |
-| Abandon / resign | **written, not applied** |
-| Matchmaking + leaderboard | **written, not applied** |
-| Match history / player pages | **written, not applied** |
+| Result verification (edge function) | done, live |
+| Elo | done, live |
+| Abandon / resign | done, live |
+| Matchmaking + leaderboard | done, live |
+| Match history / player pages | done, live |
+| Online counts (site + per game) | **written, 0010 not applied** |
 
 ### Applied on the live project
 
-`0001`, `0002`, `0003`, `0004`.
+`0001` through `0009`. The edge function is deployed.
 
-### NOT yet applied — do this first
+### NOT yet applied
 
 ```
-supabase/migrations/0005_lifecycle.sql
-supabase/migrations/0006_abandon.sql
-supabase/migrations/0007_matchmaking.sql
-supabase/migrations/0008_public_history.sql
+supabase/migrations/0010_presence.sql
 ```
 
-and deploy the edge function:
-
-```bash
-python tools/sync-rules.py && npx supabase functions deploy finish-match
-```
+Until it is, the online counters simply stay hidden — `presence.js` swallows
+the 404 and no page breaks.
 
 Verify what is actually live rather than trusting this table — probe the REST
-API (see §7). The table goes stale; the database does not.
+API (see §7). The table goes stale; the database does not. Everything above was
+last checked against the live project by probing it, not by reading this file.
 
 ## 3. Running it
 
@@ -78,11 +74,12 @@ css/    tokens · base · home · leaderboard · player · games/rps-chess
 js/
   site/     catalog · profile · authbar · home · leaderboard · player
   net/      config · supabase · auth · session · transport      (game-agnostic)
+            presence   online counts, plain fetch, no SDK
   games/rps-chess/
             rules · ai · state · ui · sync · icons · main
   vendor/   supabase-js, self-contained (~284 KB, 6 files)
 supabase/
-  migrations/*.sql
+  migrations/*.sql            0001-0009 applied; 0010 pending
   functions/finish-match/index.ts
   functions/_shared/rps-chess-rules.js   GENERATED — see §6
 tools/    serve.py · sync-rules.py
@@ -102,7 +99,13 @@ is reusable as-is; a new game only needs its own `sync.js`.
    `apply_elo`, called from a result the server established itself.
 4. **Two gates, not one.** Grants decide whether a table is reachable; policies
    decide which rows. The project runs with *automatically expose new tables*
-   **off**, so every migration must state its grants explicitly.
+   **off**, so every migration must state its grants explicitly — **and that
+   includes `service_role`, not just `anon` and `authenticated`.** With the
+   setting off there is no default privilege for anybody, so the server has
+   exactly the rights you wrote down and no others. Forgetting this is what
+   broke `finish-match` for every ranked game; see §8. Note also that
+   `service_role` has `BYPASSRLS` — that opens the row gate, never the table
+   gate, so a service-role query can still be refused outright.
 5. **`record_result` and `void_match` are service-role only.** They are how a
    result gets written; a player must never be able to call them.
 6. **Never commit the `sb_secret_...` key or the database password.** The
@@ -194,6 +197,48 @@ result — worth re-running after any rules change.
   Use the browser tools to check the dev server; `curl` works for Supabase.
 - **Supabase JS SDK is lazy.** A signed-out visitor loads zero vendor bytes.
   Do not import `supabase.js` at the top level of anything on the hot path.
+  `js/net/presence.js` is deliberately written on plain `fetch` for exactly
+  this reason — the online counter runs on the homepage, so reaching for the
+  SDK there would have cost every visitor 284 KB.
+
+### The three bugs that hid behind each other
+
+Finishing a ranked match failed for weeks, and fixing it meant peeling three
+separate faults apart in order. Worth reading before touching that path.
+
+- **`service_role` had no grant on `matches`.** *This was the real one.* The
+  edge function reads the match row directly before replaying it, and the read
+  was refused with `permission denied for table matches`, so the function
+  returned 500 before it ever reached `record_result`. Every played-out ranked
+  game stayed `live` for good. Cause: *automatically expose new tables* is off,
+  so `service_role` gets nothing by default, and migrations `0001`-`0008` only
+  ever named `anon` and `authenticated`. Fixed by `0009`, which is one line.
+  The tell that it is a *grant* problem and not an RLS one: RLS failures either
+  return no rows or say `violates row-level security policy`, never
+  `permission denied for table`.
+
+- **The CORS allow-list was too narrow**, and it masked the bug above. The
+  function answered preflights with `authorization, content-type`, but
+  supabase-js also sends `x-client-info` and `apikey`. The browser therefore
+  failed the preflight and never sent the POST at all. Two things to know:
+  `curl` will *not* reproduce this unless you pass
+  `Access-Control-Request-Headers` with the full set, so the function looks
+  perfectly healthy from a terminal; and the SDK's error text tells you which
+  layer you are on — *"Failed to send a request to the Edge Function"*
+  (`FunctionsFetchError`) means the request never left, while *"Edge Function
+  returned a non-2xx status code"* (`FunctionsHttpError`) means it arrived and
+  the function answered.
+
+- **The retry latch never released.** `sync.js` sets `finishing = true` before
+  calling `finish()`, and the failure path did not reset it — so one dropped
+  request stranded that match forever, because the 10s safety poll skipped the
+  retry from then on. Any transient blip would have done it.
+
+A note on diagnosis, because it cost most of the time: supabase-js reports
+every non-2xx as the same sentence and hides the function's own message on
+`error.context`, an unread `Response`. `transport.js` now unwraps it and
+throws `finish-match <status>: <message>`. Keep that — the entire investigation
+collapsed into one reload once the real message was on screen.
 
 ## 9. Decisions and why
 
@@ -225,5 +270,10 @@ result — worth re-running after any rules change.
   games are unrated; fix before that changes.
 - **Handle changes** — handles are immutable (no column grant). No UI to change
   one, deliberately, until the rules are decided.
-- **Nothing is committed.** The whole arc from the single-file prototype onward
-  is sitting in the working tree.
+- **The online count is spoofable.** `presence` is keyed by a browser uuid, not
+  `auth.uid()`, so two tabs count once but two browsers count twice, and a
+  caller who posts made-up uuids can inflate it. Accepted deliberately —
+  nothing reads that table to decide anything. Keep it decorative
+  (see `0010_presence.sql`).
+
+Of these, **guest → account upgrade** is the one worth doing first.

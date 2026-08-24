@@ -5,6 +5,7 @@ import {GAMES} from './catalog.js';
 import * as profile from './profile.js';
 import {mountAuthBar} from './authbar.js';
 import {onAuth} from '../net/auth.js';
+import {startPresence} from '../net/presence.js';
 
 const $ = id => document.getElementById(id);
 
@@ -44,6 +45,7 @@ function card(g){
       <p class="gcard__blurb">${g.blurb}</p>
       <div class="gcard__foot">
         <ul class="gcard__tags">${g.tags.map(t => `<li>${t}</li>`).join('')}</ul>
+        <span class="live" data-room="${g.slug}" hidden></span>
         <span class="btn btn--primary btn--sm">Play</span>
       </div>
     </div>
@@ -51,6 +53,22 @@ function card(g){
 }
 
 const renderGames = () => { $('gameGrid').innerHTML = GAMES.map(card).join(''); };
+
+/* ---------- who is around ---------- */
+/* Nobody needs to be told a game has nobody in it, so a zero hides
+   rather than reading "0 playing" next to every card on a quiet day. */
+function renderCounts({total, rooms}){
+  const t = $('liveTotal');
+  if(t){
+    t.textContent = total === 1 ? '1 online' : `${total} online`;
+    t.hidden = !total;
+  }
+  for(const el of document.querySelectorAll('.gcard .live')){
+    const n = (rooms && rooms[el.dataset.room]) || 0;
+    el.textContent = n === 1 ? '1 playing' : `${n} playing`;
+    el.hidden = !n;
+  }
+}
 
 /* ---------- name modal ---------- */
 function openModal(){
@@ -84,3 +102,4 @@ renderGames();
 renderProfile();            // paint the local view straight away
 onAuth(renderProfile);      // ...then again once sign-in settles
 mountAuthBar();
+startPresence('home', renderCounts);

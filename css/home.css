@@ -61,3 +61,7 @@ a.gcard:hover{border-color:var(--line-2);box-shadow:var(--shadow-md)}
   .wrap{padding:0 16px}
   .me{margin:18px 0 26px;padding:14px}
 }
+
+/* "Games" and the online count share a baseline */
+.games-hd{display:flex; align-items:baseline; gap:10px; margin-bottom:14px}
+.games-hd .h-games{margin-bottom:0}

@@ -216,11 +216,22 @@ function onMatch(m, presence){
 
   const rm = m.moves || [];
   const ours = game.moveList;
-  const prefixOk = rm.length >= ours.length && ours.every((x, i) => rm[i] === x);
-  if(!prefixOk){
+
+  /* Three cases, and only one of them is a resync. A row that is *shorter*
+     than our board but agrees as far as it goes is simply stale — our own
+     move has not been echoed back yet. Rebuilding on that visibly rewinds
+     the board until the next update undoes the rewind, so ignore it and
+     wait. Only a genuine disagreement is worth throwing our board away. */
+  const shared = Math.min(rm.length, ours.length);
+  let diverged = false;
+  for(let i = 0; i < shared; i++){
+    if(rm[i] !== ours[i]){ diverged = true; break; }
+  }
+
+  if(diverged){
     reset();
     for(const mv of rm) move(mv, true);
-  }else{
+  }else if(rm.length > ours.length){
     for(let k = ours.length; k < rm.length; k++) move(rm[k], true);
   }
 
