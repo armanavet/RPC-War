@@ -1,6 +1,6 @@
 # Setup
 
-Oddboard is plain static files — no build step, no dependencies.
+Oddboards is plain static files — no build step, no dependencies.
 
 Picking this up cold? Read [docs/HANDOFF.md](docs/HANDOFF.md) first.
 

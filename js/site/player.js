@@ -10,6 +10,7 @@ import {GAMES} from './catalog.js';
 import * as profile from './profile.js';
 import * as auth from '../net/auth.js';
 import {mountAuthBar} from './authbar.js';
+import {mountAds} from './ads.js';
 
 const $ = id => document.getElementById(id);
 const esc = t => String(t).replace(/[&<>"]/g, c =>
@@ -64,7 +65,7 @@ async function run(){
   }
 
   const name = who.display_name || who.handle;
-  document.title = name + ' — Oddboard';
+  document.title = name + ' — Oddboards';
   profile.paintAvatar($('pAvatar'), name);
   $('pName').textContent = name;
   $('pHandle').textContent = '@' + who.handle + (who.is_guest ? ' · guest' : '');
@@ -148,3 +149,4 @@ if(new URLSearchParams(location.search).get('h')){
     go();
   });
 }
+mountAds();

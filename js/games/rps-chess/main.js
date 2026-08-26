@@ -12,6 +12,7 @@ import * as mp from './sync.js';
 import * as profile from '../../site/profile.js';
 import {mountAuthBar} from '../../site/authbar.js';
 import {startPresence} from '../../net/presence.js';
+import {mountAds} from '../../site/ads.js';
 
 /* ---------- computer player ---------- */
 const aiEnabled = () => ui.$('aiOn').checked;
@@ -129,3 +130,4 @@ startPresence('rps-chess', ({rooms}) => {
 });
 newGame();
 mp.autoJoinFromHash();
+mountAds();

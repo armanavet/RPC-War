@@ -8,6 +8,7 @@
 import {GAMES} from './catalog.js';
 import * as profile from './profile.js';
 import {mountAuthBar} from './authbar.js';
+import {mountAds} from './ads.js';
 
 const $ = id => document.getElementById(id);
 const esc = t => String(t).replace(/[&<>"]/g, c =>
@@ -68,3 +69,4 @@ fillGames();
 $('lbGame').addEventListener('change', e => load(e.target.value));
 load(GAMES[0].slug);
 mountAuthBar();
+mountAds();

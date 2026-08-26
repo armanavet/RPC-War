@@ -1,0 +1,54 @@
+/* ============================================================
+   Ad slots.
+
+   The height is reserved here, before anything loads, so an ad
+   arriving late never pushes the page around. A slot with no
+   network configured collapses to nothing rather than leaving a
+   grey hole.
+   ============================================================ */
+
+.adslot{
+  display:none;                     /* nothing configured: no gap at all */
+  margin:26px auto 0;
+  width:100%;
+  max-width:728px;
+  min-height:90px;                  /* leaderboard unit; reserved up front */
+  overflow:hidden;
+}
+
+/* only once something is actually going in it */
+.adslot--live,
+.adslot--preview{
+  display:block;
+}
+
+.adslot--preview{
+  display:grid;place-items:center;
+  border:1px dashed var(--line-2);
+  border-radius:var(--r);
+  background:var(--surface-2);
+  color:var(--text-3);
+  font-size:12px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+
+/* the rail on a game page is narrower, and the unit with it */
+.rail .adslot{max-width:none;min-height:250px}
+
+/* a small "advertisement" label keeps AdSense happy about ads that
+   might otherwise read as site content */
+.adslot--live::before{
+  content:'Advertisement';
+  display:block;
+  font-size:10.5px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--text-3);
+  margin-bottom:6px;
+}
+
+@media (max-width:560px){
+  .adslot{min-height:100px}
+  .rail .adslot{min-height:250px}
+}

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Oddboards</title>
+<meta name="description" content="What Oddboards stores, why, and how to get rid of it.">
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="../css/base.css">
+<link rel="stylesheet" href="../css/home.css">
+<link rel="stylesheet" href="../css/prose.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar__in">
+    <a class="brand" href="../">
+      <svg class="brand__mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="var(--surface-2)" stroke="var(--line-2)" stroke-width="1.3"/>
+        <circle cx="9.5" cy="10" r="4.6" fill="var(--accent)"/>
+        <circle cx="15" cy="14.5" r="4.6" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.3"/>
+      </svg>
+      <span class="brand__name">Oddboards</span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="../">Games</a>
+      <a href="../leaderboard/">Leaderboard</a>
+    </nav>
+  </div>
+</header>
+
+<main class="stack">
+  <div class="wrap prose">
+
+    <h1 class="display">Privacy</h1>
+    <p class="prose__lead">
+      Oddboards is a small site for two-player board games. This page says
+      exactly what it stores and why. Last updated 26 August 2026.
+    </p>
+
+    <h2>You can play without an account</h2>
+    <p>
+      Playing the computer needs nothing at all. Playing a friend through an
+      invite link creates a <b>guest session</b> — an anonymous account with a
+      generated name like <i>Guest 4A2B</i>. It has no email attached and we
+      never ask for one.
+    </p>
+
+    <h2>If you sign in</h2>
+    <p>
+      Signing in uses Google or GitHub. We never see your password. From them we
+      receive your email address and display name, and we store:
+    </p>
+    <ul>
+      <li>a handle, generated from your username or email local part</li>
+      <li>your display name</li>
+      <li>the date you signed up</li>
+    </ul>
+    <p>
+      Your email is held by our authentication provider (Supabase) and is not
+      shown on the site or given to anyone.
+    </p>
+
+    <h2>Games</h2>
+    <p>
+      For each match we store the two players, the moves, the result, and the
+      rating change. <b>Finished games are public</b> — they appear on player
+      pages and feed the leaderboard.
+    </p>
+    <p>
+      <b>Chat messages inside a match are not public.</b> They are readable only
+      by the two people in that game.
+    </p>
+
+    <h2>What is kept in your browser</h2>
+    <ul>
+      <li>your sign-in session, if you signed in</li>
+      <li>a display name, if you set one while signed out</li>
+      <li>your local win/loss count for games against the computer</li>
+      <li>a random id used only to count how many people are online</li>
+    </ul>
+    <p>
+      Clearing your browser data removes all of it. The online-count id is a
+      random number and is not linked to your account.
+    </p>
+
+    <h2>Analytics</h2>
+    <p>
+      There are none. No Google Analytics, no tracking pixels, no fingerprinting.
+      The only number the site collects is a count of how many people are
+      currently on it.
+    </p>
+
+    <h2 id="ads">Advertising</h2>
+    <p class="prose__note" id="adsOff">
+      There are currently no ads on this site, and no advertising or analytics
+      code is loaded. If that changes, this section will be updated before any
+      ad appears.
+    </p>
+    <div id="adsOn" hidden>
+      <p>
+        This site shows ads to help pay for itself. Our advertising partner may
+        set cookies or read device identifiers to measure and, where permitted,
+        personalise what you see.
+      </p>
+      <p>
+        If you are in the EEA, UK or Switzerland you will be asked for consent
+        before any personalised advertising happens, and you can change your
+        answer at any time.
+      </p>
+      <p>
+        Google, as a third-party vendor, uses cookies to serve ads. You can opt
+        out of personalised advertising in
+        <a href="https://www.google.com/settings/ads" rel="noopener">Google's ad
+        settings</a>, and find more options at
+        <a href="https://optout.aboutads.info/" rel="noopener">aboutads.info</a>.
+      </p>
+    </div>
+
+    <h2>Where it is stored</h2>
+    <p>
+      The site is served by GitHub Pages. Accounts, games and ratings live in a
+      Supabase project. Both may process data outside your country.
+    </p>
+
+    <h2>Deleting your data</h2>
+    <p>
+      Ask and your account, ratings and chat messages will be deleted. Finished
+      games are part of other players' records, so those are anonymised rather
+      than removed — your name is detached from them.
+    </p>
+    <p class="prose__contact">
+      <b>Contact:</b> <span id="contact">— add your contact address here —</span>
+    </p>
+
+    <h2>Children</h2>
+    <p>
+      Oddboards is not directed at children under 13 and we do not knowingly
+      collect their information.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If this policy changes materially, the date at the top changes with it.
+    </p>
+
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__in">
+    <a href="../">Oddboards</a>
+    <span class="muted">Play without an account, if you like.</span>
+  </div>
+</footer>
+
+</body>
+</html>

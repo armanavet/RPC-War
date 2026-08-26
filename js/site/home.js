@@ -6,6 +6,7 @@ import * as profile from './profile.js';
 import {mountAuthBar} from './authbar.js';
 import {onAuth} from '../net/auth.js';
 import {startPresence} from '../net/presence.js';
+import {mountAds} from './ads.js';
 
 const $ = id => document.getElementById(id);
 
@@ -103,3 +104,4 @@ renderProfile();            // paint the local view straight away
 onAuth(renderProfile);      // ...then again once sign-in settles
 mountAuthBar();
 startPresence('home', renderCounts);
+mountAds();

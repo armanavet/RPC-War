@@ -1,4 +1,4 @@
-# Oddboard — handoff
+# Oddboards — handoff
 
 Everything a fresh session needs to pick this up. Read this first, then
 [SETUP.md](../SETUP.md) for running it and [accounts.md](accounts.md) for the
@@ -11,7 +11,7 @@ design of the backend.
 A site for two-player board games — "chess.com for odd little games". One game
 exists: **RPS Chess** (9×9, every piece moves like a king, captures are settled
 with rock-paper-scissors). Static files, no build step, ES modules, deployed on
-GitHub Pages at <https://armanavet.github.io/RPC-War/>. Backend is Supabase.
+GitHub Pages at <https://oddboards.com>. Backend is Supabase.
 
 Repo: `armanavet/RPC-War`. Branch `main`.
 
@@ -124,7 +124,7 @@ Project ref `gderpmkfszmlrqhfmhvg`. URL and publishable key live in
 | Automatically expose new tables | **off** |
 | Automatic RLS | on |
 | Providers | Google, GitHub, Anonymous on; Email off |
-| Redirect URLs | dev origin + `https://armanavet.github.io/RPC-War/**` |
+| Redirect URLs | dev origin + `https://oddboards.com/**` |
 
 **The edge function** replays a finished game through `rules.js` and records
 what it finds, ignoring whatever the client claimed. It cannot import from
