@@ -2,7 +2,7 @@
    finish-match — the only thing allowed to decide who won.
 
    A client says "this match is over". The server ignores that claim
-   and replays the whole move list through the very same rules.js the
+   and replays the whole move list through the very same rules the
    browser used. Whatever the replay says is what gets recorded.
 
    That means a modified client can lie about the result and simply
@@ -10,13 +10,17 @@
    illegal move — which is recorded as a loss for whoever played it,
    so voiding is never the profitable option.
 
+   One verifier per game, picked by matches.game. Adding a game
+   means adding a replay function to VERIFIERS and running
+   tools/sync-rules.py so its rules file is bundled.
+
    POST { matchId }   with the caller's Authorization: Bearer <jwt>
    ============================================================ */
 import {createClient} from 'jsr:@supabase/supabase-js@2';
-import {
-  BLUE, RED, rowOf, goalRow,
-  startBoard, genMoves, apply, count,
-} from '../_shared/rps-chess-rules.js';
+import * as rps from '../_shared/rps-chess-rules.js';
+import * as slip from '../_shared/slipstream-rules.js';
+import * as anvil from '../_shared/anvil-rules.js';
+import * as cairn from '../_shared/cairn-rules.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -35,34 +39,127 @@ type Replay =
   | {kind: 'unfinished'}
   | {kind: 'over'; result: 'blue' | 'red' | 'draw'; reason: string};
 
-/* Mirrors the win detection in js/games/rps-chess/state.js. */
-function replay(moves: number[]): Replay {
-  let bd = startBoard().b;
-  let turn = BLUE;
+/* ---------- RPS Chess ----------
+   Mirrors the win detection in js/games/rps-chess/state.js. */
+function replayRps(moves: number[]): Replay {
+  let bd = rps.startBoard().b;
+  let turn = rps.BLUE;
 
   for(let i = 0; i < moves.length; i++){
     const mv = moves[i];
-    if(!genMoves(bd, turn).includes(mv)) return {kind: 'illegal', index: i};
+    if(!rps.genMoves(bd, turn).includes(mv)) return {kind: 'illegal', index: i};
 
-    const res = apply(bd, mv);
+    const res = rps.apply(bd, mv);
     const mover = turn;
     const landed = (res.o === 'move' || res.o === 'win');
     bd = res.bd;
     turn = 1 - turn;
 
-    const nB = count(bd, BLUE), nR = count(bd, RED);
-    if(landed && rowOf(res.to) === goalRow(mover)){
-      return {kind: 'over', result: mover === BLUE ? 'blue' : 'red', reason: 'backrow'};
+    const nB = rps.count(bd, rps.BLUE), nR = rps.count(bd, rps.RED);
+    if(landed && rps.rowOf(res.to) === rps.goalRow(mover)){
+      return {kind: 'over', result: mover === rps.BLUE ? 'blue' : 'red', reason: 'backrow'};
     }
     if(nB === 0 && nR === 0) return {kind: 'over', result: 'draw', reason: 'wipeout'};
     if(nR === 0) return {kind: 'over', result: 'blue', reason: 'wipeout'};
     if(nB === 0) return {kind: 'over', result: 'red',  reason: 'wipeout'};
-    if(genMoves(bd, turn).length === 0){
+    if(rps.genMoves(bd, turn).length === 0){
       return {kind: 'over', result: 'draw', reason: 'nomoves'};
     }
   }
   return {kind: 'unfinished'};
 }
+
+/* ---------- Slipstream ----------
+   Mirrors js/games/slipstream/state.js. The ring timer is a pure
+   function of the move index, so the server needs nothing extra to
+   agree with the clients. */
+function replaySlipstream(moves: number[]): Replay {
+  let bd = slip.startBoard().b;
+  let turn = slip.BLUE;
+
+  for(let ply = 0; ply < moves.length; ply++){
+    const mv = moves[ply];
+    if(!slip.genMoves(bd, turn, ply).includes(mv)) return {kind: 'illegal', index: ply};
+
+    bd = slip.apply(bd, mv, ply).bd;
+    turn = 1 - turn;
+
+    const nB = slip.count(bd, slip.BLUE), nR = slip.count(bd, slip.RED);
+    if(nB === 0 && nR === 0) return {kind: 'over', result: 'draw', reason: 'wipeout'};
+    if(nR === 0) return {kind: 'over', result: 'blue', reason: 'wipeout'};
+    if(nB === 0) return {kind: 'over', result: 'red',  reason: 'wipeout'};
+    if(slip.genMoves(bd, turn, ply + 1).length === 0){
+      // the player to move is jammed, so the other one wins
+      return {kind: 'over', result: turn === slip.BLUE ? 'red' : 'blue', reason: 'nomoves'};
+    }
+    if(ply + 1 >= slip.PLY_CAP) return {kind: 'over', result: 'draw', reason: 'capped'};
+  }
+  return {kind: 'unfinished'};
+}
+
+/* ---------- Anvil ----------
+   Mirrors js/games/anvil/state.js. The anvil is claimed at the start
+   of a turn, so the check happens after the turn has passed. */
+function replayAnvil(moves: number[]): Replay {
+  let bd = anvil.startBoard().b;
+  let turn = anvil.BLUE;
+
+  for(let ply = 0; ply < moves.length; ply++){
+    const mv = moves[ply];
+    if(!anvil.genMoves(bd, turn).includes(mv)) return {kind: 'illegal', index: ply};
+
+    bd = anvil.apply(bd, mv).bd;
+    turn = 1 - turn;
+
+    const nB = anvil.count(bd, anvil.BLUE), nR = anvil.count(bd, anvil.RED);
+    if(nR <= anvil.LOSE_AT) return {kind: 'over', result: 'blue', reason: 'wipeout'};
+    if(nB <= anvil.LOSE_AT) return {kind: 'over', result: 'red',  reason: 'wipeout'};
+    if(anvil.holds(bd, turn) >= anvil.HOLD_TO_WIN){
+      return {kind: 'over', result: turn === anvil.BLUE ? 'blue' : 'red', reason: 'anvil'};
+    }
+    if(anvil.genMoves(bd, turn).length === 0){
+      return {kind: 'over', result: turn === anvil.BLUE ? 'red' : 'blue', reason: 'nomoves'};
+    }
+    if(ply + 1 >= anvil.PLY_CAP) return {kind: 'over', result: 'draw', reason: 'capped'};
+  }
+  return {kind: 'unfinished'};
+}
+
+/* ---------- Cairn ----------
+   Mirrors js/games/cairn/state.js. The board here is an array of
+   arrays, so `apply` is the only thing allowed to copy it. */
+function replayCairn(moves: number[]): Replay {
+  let bd = cairn.startBoard().b;
+  let turn = cairn.BLUE;
+
+  for(let ply = 0; ply < moves.length; ply++){
+    const mv = moves[ply];
+    if(!cairn.genMoves(bd, turn).includes(mv)) return {kind: 'illegal', index: ply};
+
+    bd = cairn.apply(bd, mv).bd;
+    turn = 1 - turn;
+
+    const nB = cairn.count(bd, cairn.BLUE), nR = cairn.count(bd, cairn.RED);
+    if(nR <= cairn.LOSE_AT || cairn.controls(bd, cairn.RED) === 0){
+      return {kind: 'over', result: 'blue', reason: 'wipeout'};
+    }
+    if(nB <= cairn.LOSE_AT || cairn.controls(bd, cairn.BLUE) === 0){
+      return {kind: 'over', result: 'red', reason: 'wipeout'};
+    }
+    if(cairn.genMoves(bd, turn).length === 0){
+      return {kind: 'over', result: turn === cairn.BLUE ? 'red' : 'blue', reason: 'nomoves'};
+    }
+    if(ply + 1 >= cairn.PLY_CAP) return {kind: 'over', result: 'draw', reason: 'capped'};
+  }
+  return {kind: 'unfinished'};
+}
+
+const VERIFIERS: Record<string, (m: number[]) => Replay> = {
+  'rps-chess': replayRps,
+  'slipstream': replaySlipstream,
+  'anvil': replayAnvil,
+  'cairn': replayCairn,
+};
 
 Deno.serve(async (req) => {
   if(req.method === 'OPTIONS') return new Response('ok', {headers: cors});
@@ -90,13 +187,16 @@ Deno.serve(async (req) => {
   if(!matchId) return json({error: 'matchId required'}, 400);
 
   const {data: m, error} = await admin
-    .from('matches').select('id,blue,red,state,moves').eq('id', matchId).maybeSingle();
+    .from('matches').select('id,game,blue,red,state,moves').eq('id', matchId).maybeSingle();
   if(error) return json({error: error.message}, 500);
   if(!m) return json({error: 'no such match'}, 404);
   if(m.blue !== uid && m.red !== uid) return json({error: 'not your match'}, 403);
   if(m.state !== 'live') return json({ok: true, already: m.state});
 
-  const verdict = replay((m.moves || []) as number[]);
+  const verify = VERIFIERS[m.game as string];
+  if(!verify) return json({error: 'no verifier for ' + m.game}, 501);
+
+  const verdict = verify((m.moves || []) as number[]);
 
   if(verdict.kind === 'unfinished'){
     return json({error: 'that game is not over'}, 409);

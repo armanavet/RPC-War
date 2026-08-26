@@ -1,11 +1,16 @@
 /* ============================================================
    Design tokens. Everything visual resolves to these.
 
-   Light by default, dark when the reader's system asks for it.
+   Light, always. The dark palette is kept below but is now behind an
+   explicit data-theme="dark" on the root element, so the operating
+   system's preference no longer switches it. Set that attribute to
+   bring dark back.
    Neutral greys, one accent (green — it has to stay out of the way
    of the blue and red players), system fonts, no decoration.
    ============================================================ */
 :root{
+  color-scheme: light;
+
   /* --- surfaces --- */
   --page:       #F6F7F9;
   --surface:    #FFFFFF;
@@ -38,6 +43,7 @@
   /* --- board --- */
   --board-lite: #E9EDF2;
   --board-dark: #BCC6D2;
+  --wall:       #55606C;   /* must be obviously darker than board-dark */
 
   /* --- fight outcomes --- */
   --good: #1E7A4A;
@@ -66,8 +72,7 @@
   --med:  .2s var(--ease);
 }
 
-@media (prefers-color-scheme: dark){
-  :root{
+:root[data-theme="dark"]{
     --page:       #15181C;
     --surface:    #1D2126;
     --surface-2:  #23282E;
@@ -94,6 +99,7 @@
 
     --board-lite: #495663;
     --board-dark: #3A444F;
+    --wall:       #171C22;
 
     --good: #3FA972;
     --even: #D2A03F;
@@ -102,7 +108,6 @@
     --shadow:    0 1px 2px rgba(0,0,0,.3), 0 1px 3px rgba(0,0,0,.25);
     --shadow-md: 0 4px 12px rgba(0,0,0,.35);
     --shadow-lg: 0 12px 32px rgba(0,0,0,.45);
-  }
 }
 
 @media (prefers-reduced-motion: reduce){

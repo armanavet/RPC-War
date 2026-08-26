@@ -1,21 +1,19 @@
 /* ============================================================
-   Online play for RPS Chess.
-
-   All of the machinery — matches, Realtime, rematch, resign,
-   abandon, ranked queue, chat — lives in js/net/matchsync.js and
-   is shared with every other game. This file only says which game
-   it is and how its end-reasons read.
+   Online play for Anvil. Everything real lives in
+   js/net/matchsync.js and is shared with every other game.
    ============================================================ */
 import {createSync} from '../../net/matchsync.js';
 import {game, reset, move} from './state.js';
 import * as ui from './ui.js';
 
 const mp = createSync({
-  slug: 'rps-chess',
+  slug: 'anvil',
   state: {game, reset, move},
   ui,
   reasons: {
-    backrow: 'reached the back row',
+    anvil:   'held the anvil',
+    wipeout: 'shoved into the sea',
+    nomoves: 'no move left',
   },
 });
 

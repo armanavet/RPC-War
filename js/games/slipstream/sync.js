@@ -1,21 +1,20 @@
 /* ============================================================
-   Online play for RPS Chess.
+   Online play for Slipstream.
 
-   All of the machinery — matches, Realtime, rematch, resign,
-   abandon, ranked queue, chat — lives in js/net/matchsync.js and
-   is shared with every other game. This file only says which game
-   it is and how its end-reasons read.
+   Everything real lives in js/net/matchsync.js and is shared with
+   every other game. This only says which game it is.
    ============================================================ */
 import {createSync} from '../../net/matchsync.js';
 import {game, reset, move} from './state.js';
 import * as ui from './ui.js';
 
 const mp = createSync({
-  slug: 'rps-chess',
+  slug: 'slipstream',
   state: {game, reset, move},
   ui,
   reasons: {
-    backrow: 'reached the back row',
+    wipeout: 'no pieces left',
+    nomoves: 'nowhere left to slide',
   },
 });
 
