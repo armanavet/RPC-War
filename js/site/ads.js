@@ -20,8 +20,8 @@
    ============================================================ */
 
 export const ADS = {
-  /* 'none' | 'adsense' | 'ethical' */
-  network: 'none',
+  /* 'none' | 'aads' | 'adsense' | 'ethical' */
+  network: 'aads',
 
   adsense: {
     client: '',            // 'ca-pub-0000000000000000'
@@ -36,7 +36,30 @@ export const ADS = {
   ethical: {
     publisher: '',         // your EthicalAds publisher id
   },
+
+  /* A-ADS. One unit id is enough to start — `unit` is used for every
+     placement that has no entry of its own. Separate ids only buy you
+     separate stats. Nothing loads while these are blank. */
+  aads: {
+    unit: '2453421',       // a-ads.com unit; covers every slot
+    units: {
+      home: '',
+      leaderboard: '',
+      player: '',
+      game: '',
+    },
+  },
 };
+
+/* A-ADS serves fixed sizes, so pick the biggest that actually fits the
+   space rather than letting a 728-wide unit hang off a phone. */
+const AADS_SIZES = [[728, 90], [468, 60], [320, 100], [320, 50]];
+
+function bestSize(width, tall){
+  const pool = tall ? [[300, 250], [336, 280], [320, 100], [320, 50]] : AADS_SIZES;
+  for(const [w, h] of pool) if(w <= width) return [w, h];
+  return [320, 50];
+}
 
 const PREVIEW = new URLSearchParams(location.search).get('ads') === 'preview';
 
@@ -85,6 +108,32 @@ async function fillAdsense(el){
   (window.adsbygoogle = window.adsbygoogle || []).push({});
 }
 
+/* No script, no cookies: A-ADS is an iframe and nothing else. That is
+   why it needs no consent banner and cannot slow the page down. */
+function fillAads(el){
+  const {unit, units} = ADS.aads;
+  const id = units[el.dataset.ad] || unit;
+  if(!id) return;                                 // not configured: stay collapsed
+
+  const tall = !!el.closest('.rail');
+  const room = el.getBoundingClientRect().width || el.parentElement.getBoundingClientRect().width;
+  const [w, h] = bestSize(Math.floor(room) || 320, tall);
+
+  /* set the height before the frame exists, so nothing shifts later */
+  el.style.minHeight = h + 'px';
+  el.classList.add('adslot--live');
+
+  const f = document.createElement('iframe');
+  f.src = `https://ad.a-ads.com/${id}?size=${w}x${h}`;
+  f.width = w;
+  f.height = h;
+  f.loading = 'lazy';
+  f.scrolling = 'no';
+  f.title = 'Advertisement';
+  f.style.cssText = 'border:0;padding:0;overflow:hidden;background:transparent;display:block;margin:0 auto';
+  el.appendChild(f);
+}
+
 async function fillEthical(el){
   const {publisher} = ADS.ethical;
   if(!publisher) return;
@@ -108,6 +157,8 @@ export function mountAds(){
   for(const el of slots){
     if(PREVIEW){ fillPreview(el); continue; }
     if(ADS.network === 'none') continue;          // stays display:none
+
+    if(ADS.network === 'aads'){ fillAads(el); continue; }   // synchronous, no script
 
     const fill = ADS.network === 'adsense' ? fillAdsense
                : ADS.network === 'ethical' ? fillEthical
