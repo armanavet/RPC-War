@@ -59,6 +59,23 @@ export function createSync({slug, state, ui, reasons}){
   let finishing = false;   // one finish request per match, not one per render
   let heartbeat = null;
   let queueTimer = null;
+  let lastNudge = 0;
+
+  /* One nudge per move was a single point of failure: it is fire and
+     forget and swallows its own errors, so a dropped call meant the
+     opponent silently never moved again and nothing retried. Now every
+     match update re-checks whose turn it is, so the 10s safety poll and
+     each realtime event are both chances to recover. Throttled, because
+     it is also called straight after our own move. */
+  function nudgeIfTheirTurn(m){
+    if(!net.on || m.state !== 'live' || !net.ready) return;
+    const n = (m.moves || []).length;
+    if((n % 2) === net.side) return;             // our move to make
+    const now = Date.now();
+    if(now - lastNudge < 4000) return;
+    lastNudge = now;
+    T.nudge(m.id);
+  }
 
   const myId = () => (T.me() || {}).id || null;
 
@@ -120,6 +137,7 @@ export function createSync({slug, state, ui, reasons}){
 
     net.unwatch = T.watch(m.id, onMatch, onChat);
     /* If the opponent moves first, nothing else would ever ask them to. */
+    lastNudge = Date.now();
     T.nudge(m.id);
     startHeartbeat();
     ui.renderMpPanels();
@@ -217,6 +235,10 @@ export function createSync({slug, state, ui, reasons}){
         why: reasonText(m.reason),
       };
     }
+
+    /* Whoever they are, if it is their turn and nothing has happened,
+       ask again. Harmless in a game between two people. */
+    nudgeIfTheirTurn(m);
 
     ui.renderMpPanels();
     ui.render();
@@ -344,6 +366,7 @@ export function createSync({slug, state, ui, reasons}){
     async pushMove(mv){
       try{
         await T.playMove(net.matchId, mv);
+        lastNudge = Date.now();
         T.nudge(net.matchId);        // their turn now, whoever they are
       }catch(e){
         // the server refused it — our board is now ahead of the truth

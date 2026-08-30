@@ -95,7 +95,11 @@ const SupaT = {
           body: {matchId},
           headers: session ? {Authorization: 'Bearer ' + session.access_token} : {},
         })))
-      .catch(() => {});
+      /* Silent for the player — it must never surface a message or slow a
+         move down — but not silent for us. The same call goes out in every
+         match, so logging that it failed reveals nothing about who the
+         opponent was, and without it a broken nudge is undiagnosable. */
+      .catch(e => console.debug('nudge failed:', (e && e.message) || e));
   },
 
   async touch(matchId){ try{ await this._rpc('touch_match', {p_match: matchId}); }catch(e){} },
