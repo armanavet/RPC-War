@@ -34,6 +34,15 @@ const MARK = {
 
 const LABEL = {google: 'Google', github: 'GitHub'};
 
+/* The bar is on pages at three different depths (/, /leaderboard/,
+   /games/<slug>/), so links out of it have to climb back to the site
+   root themselves. An absolute /player/ would break the moment the
+   site is served from a subpath again. */
+const ROOT = (() => {
+  const segs = location.pathname.replace(/\/[^/]*$/, '').split('/').filter(Boolean);
+  return segs.length ? '../'.repeat(segs.length) : './';
+})();
+
 let menu = null;
 
 function closeMenu(){
@@ -69,6 +78,7 @@ function openAccountMenu(btn){
        <div class="menu__name">${esc(profile.displayName())}</div>
        <div class="menu__handle">@${esc(acc ? acc.handle : '')}</div>
      </div>
+     <a class="menu__item" href="${ROOT}player/?h=${encodeURIComponent(acc ? acc.handle : '')}">Your profile</a>
      <button class="menu__item" id="menuSignOut">Sign out</button>`);
   el.querySelector('#menuSignOut').addEventListener('click', async () => {
     closeMenu();

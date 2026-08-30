@@ -33,3 +33,21 @@
   .pstats{margin:12px 0 0;width:100%}
   .pstats .stat{text-align:left}
 }
+
+@media (max-width:480px){
+  /* Four columns across 300-odd pixels leaves ~46px of content per
+     cell, which is not enough for a game's name — "RPS CHESS" wrapped
+     to two lines and dragged the whole block taller. Two by two gives
+     each label room to sit on one line. */
+  .pstats{grid-template-columns:repeat(2,1fr)}
+  .pstats dt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pstats dd{font-size:19px}
+
+  /* An opponent with two long names wrapped every row to double height
+     and left the table ragged. One line, clipped. */
+  .hist__opp{
+    display:block;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    max-width:100%;
+  }
+}

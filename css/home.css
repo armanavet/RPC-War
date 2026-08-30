@@ -104,6 +104,15 @@ a.gcard:hover{
 @media (max-width:480px){
   .hero{padding:30px 0 22px}
   .me{margin:0 0 24px;padding:13px}
+
+  /* Avatar and identity on the first row, the action on its own row
+     underneath. Squeezed onto one line the name truncated to "Arman
+     Ave..." and the stats ran to three lines beside a button. */
+  .me{flex-wrap:wrap;gap:10px 12px}
+  .me__who{flex:1 1 auto;min-width:0}
+  .me .btn{flex:1 1 100%;order:3;justify-content:center}
+  .me__name{font-size:17px}
+  .me__line{font-size:13px}
 }
 
 /* "Games" and the online count share a baseline */

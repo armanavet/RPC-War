@@ -18,6 +18,13 @@ function renderProfile(){
   profile.paintAvatar($('profileAvatar'), name);
   $('profileName').textContent = name;
 
+  /* Signed in, the strip is the obvious place to look for your own
+     page — the account menu carries the same link for every other
+     page on the site. */
+  const link = $('profileLink');
+  if(link) link.style.display = acc ? '' : 'none';
+  if(acc && link) link.href = 'player/?h=' + encodeURIComponent(acc.handle);
+
   if(acc){
     $('profileStats').textContent = '@' + acc.handle;
     $('btnEditName').style.display = 'none';

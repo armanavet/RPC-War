@@ -38,8 +38,34 @@ a.lb__who:hover .lb__name{text-decoration:underline;text-underline-offset:2px}
 @media (max-width:480px){
   .lb__wide{display:none}
   .lb__handle{display:none}
-  .lb__hd{flex-wrap:wrap}
+  .lb__hd{flex-wrap:wrap;gap:10px;margin:16px 0 12px}
   .lb__pick{margin-left:0;width:100%}
+
+  /* The panel is clipped so its rounded corners survive the tinted
+     header row — which means a table wider than the panel loses its
+     right-hand columns silently rather than scrolling. On a 360px
+     phone that was the rating: the one column the page exists for.
+     table-layout:fixed makes overflow impossible instead of hidden. */
+  .lb{table-layout:fixed;width:100%;font-size:14px}
+  .lb thead th,
+  .lb td{padding:9px 10px}
+
+  .lb__rank{width:34px;font-size:15px}
+  .lb__num{width:58px}
+
+  /* the name is the only elastic column, so it is the one that ellipses */
+  .lb__who{gap:8px}
+  .lb__name{font-size:15px;min-width:0}
+  .lb .avatar--sm{width:24px;height:24px;font-size:10px;flex:none}
+
+  .lb__you{font-size:9.5px;padding:1px 5px}
+}
+
+/* Very narrow phones: the avatar is the first thing that can go, since
+   the name beside it says the same thing. */
+@media (max-width:340px){
+  .lb .avatar--sm{display:none}
+  .lb__rank{width:28px}
 }
 
 /* Both tables already sit in a .panel, which now carries the card stock
