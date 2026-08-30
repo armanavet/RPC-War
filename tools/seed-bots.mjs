@@ -1,13 +1,17 @@
 /* ============================================================
    Create the bot accounts.
 
-   Run once, after applying supabase/migrations/0011_bots.sql. It is
-   idempotent: re-running updates personas and adds any that are
-   missing rather than duplicating them.
+   Run after applying supabase/migrations/0011_bots.sql.
 
-     SUPABASE_URL=https://<ref>.supabase.co \
-     SUPABASE_SERVICE_KEY=sb_secret_... \
-     node tools/seed-bots.mjs [count]
+     node tools/seed-bots.mjs --key sb_secret_xxxxx
+     node tools/seed-bots.mjs --key sb_secret_xxxxx --reset
+
+   NOT idempotent without --reset. Every run invents fresh names, so a
+   second plain run adds another hundred bots rather than updating the
+   ones already there. --reset deletes the existing bot accounts first,
+   which is also how you change their names: a profile's handle is
+   written by the signup trigger and never revisited, so a rename means
+   a new account.
 
    Plain fetch, no dependencies — this is the one script that handles
    the secret key, so it should be readable end to end in one sitting.
@@ -19,18 +23,60 @@
    is bot_presence_tick() in the migration, and it needs none of this.
    ============================================================ */
 
-const URL_ = process.env.SUPABASE_URL;
-const KEY = process.env.SUPABASE_SERVICE_KEY;
-const COUNT = Number(process.argv[2] || 100);
+/* Arguments, not environment variables. `VAR=x node ...` is POSIX
+   syntax and simply errors on Windows, which is where this project is
+   developed — so the key comes in as a flag and the URL defaults to
+   whatever js/net/config.js already points at.
 
-if(!URL_ || !KEY){
-  console.error('Set SUPABASE_URL and SUPABASE_SERVICE_KEY.');
+     node tools/seed-bots.mjs --key sb_secret_xxx
+     node tools/seed-bots.mjs --key sb_secret_xxx --count 120
+*/
+import {readFileSync} from 'node:fs';
+
+function arg(name, fallback){
+  const i = process.argv.indexOf('--' + name);
+  return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
+}
+
+function urlFromConfig(){
+  try{
+    const src = readFileSync(new URL('../js/net/config.js', import.meta.url), 'utf8');
+    return (src.match(/SUPABASE_URL\s*=\s*'([^']+)'/) || [])[1] || null;
+  }catch{ return null; }
+}
+
+const URL_ = arg('url', process.env.SUPABASE_URL || urlFromConfig());
+const KEY = arg('key', process.env.SUPABASE_SERVICE_KEY);
+const COUNT = Number(arg('count', 100));
+
+if(!URL_){
+  console.error('No project URL. Pass --url https://<ref>.supabase.co');
+  process.exit(1);
+}
+if(!KEY){
+  console.error('');
+  console.error('No service key.');
+  console.error('');
+  console.error('  node tools/seed-bots.mjs --key sb_secret_xxxxx');
+  console.error('');
+  console.error('Dashboard -> Settings -> API keys -> secret key.');
+  console.error('It bypasses row level security. Never commit it.');
+  console.error('');
   process.exit(1);
 }
 if(!/^sb_secret_|^ey/.test(KEY)){
-  console.error('That does not look like a service key.');
+  console.error('That does not look like a service key (expected sb_secret_... ).');
   process.exit(1);
 }
+
+const RESET = process.argv.includes('--reset');
+
+/* Every bot address lives on this domain. .invalid is reserved by
+   RFC 2606 and can never resolve, so nothing here can ever match a
+   real person's account — which is what makes deleting by suffix safe. */
+const BOT_DOMAIN = '@bots.oddboards.invalid';
+
+console.log(`seeding ${COUNT} bots into ${URL_}${RESET ? ' (resetting first)' : ''}`);
 
 const GAMES = ['rps-chess', 'anvil'];
 
@@ -94,26 +140,71 @@ async function api(path, opts = {}){
   return {ok: r.ok, status: r.status, body};
 }
 
+const cap = s => s[0].toUpperCase() + s.slice(1);
+
+/* Name and handle come from the *same* person.
+
+   They used to be drawn independently, which produced rows like
+   "Hana Delacroix @ivo_xhalv" — nobody picks a handle out of someone
+   else's name, and fifty of those in a column is exactly the kind of
+   thing that reads as generated. So a first and last name are chosen
+   once, and both the handle and the display name are built from them,
+   in the several shapes real people actually use. */
 const used = new Set();
-function handle(){
-  for(let i = 0; i < 200; i++){
-    const h = (pick(FIRST) + pick(HANDLEY) + (Math.random() < 0.35 ? pick(LAST).slice(0, 4) : ''))
+function person(){
+  for(let attempt = 0; attempt < 300; attempt++){
+    const first = pick(FIRST), last = pick(LAST);
+    const tail = pick(HANDLEY);
+    const shapes = [
+      () => first + tail,                        // nina, nina88
+      () => first + last.slice(0, 4) + tail,     // ninahalv
+      () => first[0] + last + tail,              // nhalvorsen
+      () => first + '_' + last[0],               // nina_h
+      () => last + tail,                         // halvorsen7
+      () => first + last[0] + tail,              // ninah93
+    ];
+    const h = shapes[rnd(shapes.length)]()
       .replace(/[^a-z0-9_]/g, '').slice(0, 16);
-    if(h.length >= 3 && !used.has(h)){ used.add(h); return h; }
+    if(h.length < 3 || used.has(h)) continue;
+    used.add(h);
+
+    const roll = Math.random();
+    const display = roll < 0.5 ? cap(first) + ' ' + cap(last)
+                  : roll < 0.72 ? cap(first)
+                  : roll < 0.88 ? cap(first) + ' ' + cap(last[0]) + '.'
+                  : cap(first) + cap(last);
+    return {handle: h, display};
   }
   const h = 'player' + rnd(99999);
-  used.add(h); return h;
+  used.add(h);
+  return {handle: h, display: cap(h)};
 }
 
-const cap = s => s[0].toUpperCase() + s.slice(1);
+/* Delete every existing bot account. The cascade from auth.users takes
+   the profile with it, and the cascades from profiles take the rating
+   and the bots row — so this leaves nothing behind. */
+async function reset(){
+  let removed = 0;
+  for(let page = 1; page <= 40; page++){
+    const res = await api(`/auth/v1/admin/users?page=${page}&per_page=200`);
+    const users = res.body?.users || [];
+    if(!users.length) break;
+    const mine = users.filter(u => (u.email || '').endsWith(BOT_DOMAIN));
+    for(const u of mine){
+      const d = await api('/auth/v1/admin/users/' + u.id, {method: 'DELETE'});
+      if(d.ok) removed++;
+    }
+    if(users.length < 200) break;
+  }
+  console.log(`  removed ${removed} existing bot accounts`);
+}
+
+if(RESET) await reset();
 
 let made = 0, updated = 0, failed = 0;
 
 for(let i = 0; i < COUNT; i++){
-  const h = handle();
-  const display = Math.random() < 0.55
-    ? cap(pick(FIRST)) + ' ' + cap(pick(LAST))
-    : cap(h.replace(/[_0-9]+/g, ''));
+  const {handle: h, display} = person();
   const game = GAMES[i % GAMES.length];
   const r = rating();
   const p = persona(r);
@@ -163,6 +254,14 @@ for(let i = 0; i < COUNT; i++){
 
   if((i + 1) % 20 === 0) console.log(`  ${i + 1}/${COUNT}`);
 }
+
+/* A fresh bot has a rating but no games behind it, and the leaderboard
+   filters on played > 0 — so without this they exist but do not appear
+   on the board they were created to fill. Needs 0013_bot_ladder.sql. */
+const hist = await api('/rest/v1/rpc/bot_seed_history', {method: 'POST', body: '{}'});
+if(hist.ok) console.log(`gave ${hist.body} bots a match history`);
+else console.log('bot_seed_history unavailable - apply 0013_bot_ladder.sql, then run'
+                + ' select public.bot_seed_history();');
 
 console.log(`\ncreated ${made}, refreshed ${updated}, failed ${failed}`);
 console.log('bots are only reachable through find_match; nothing about them is readable by a client.');

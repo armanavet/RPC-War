@@ -46,3 +46,36 @@ a.lb__who:hover .lb__name{text-decoration:underline;text-underline-offset:2px}
    and a rounded edge — so the header row has to be clipped to it, or the
    tinted thead squares off the panel's top corners. */
 .panel:has(> .lb){overflow:hidden}
+
+/* ---------- your own row ----------
+   The board is mostly strangers, so the one row that is you should be
+   findable without reading names. A tinted band and a left rule do it
+   without shouting; the rank and rating stay in their columns so the
+   table still scans straight down. */
+.lb tbody tr.is-you td{
+  background:var(--accent-tint);
+  border-top:1px solid var(--accent-ring);
+  border-bottom:1px solid var(--accent-ring);
+}
+.lb tbody tr.is-you td:first-child{
+  box-shadow:inset 3px 0 0 var(--accent);
+  border-radius:var(--r-xs) 0 0 var(--r-xs);
+}
+.lb tbody tr.is-you:hover td{background:var(--accent-tint)}
+.lb tbody tr.is-you .lb__rank{color:var(--accent)}
+
+.lb__you{
+  font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--accent-fg);background:var(--accent);
+  padding:2px 6px;border-radius:var(--r-pill);
+  margin-left:2px;flex:none;
+}
+
+/* the break between the visible page of the ladder and your own place
+   further down it */
+.lb__gap td{
+  height:18px;padding:0;
+  background:
+    radial-gradient(circle at 50% 50%, var(--line-2) 1.2px, transparent 1.3px)
+    center/10px 6px repeat-x;
+}
