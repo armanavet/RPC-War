@@ -20,6 +20,7 @@ export const net = {
   rematchOffer: null, // who has offered one, if anyone
   delta: null,        // our rating change, once the server has applied it
   queued: false,      // waiting in the ranked queue
+  canRank: false,     // ranked needs a real account — guests are barred server-side
   abandonable: false, // the opponent has gone quiet long enough to claim
   unwatch: null,
 };

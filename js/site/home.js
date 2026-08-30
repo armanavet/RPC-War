@@ -22,11 +22,12 @@ function renderProfile(){
     $('profileStats').textContent = '@' + acc.handle;
     $('btnEditName').style.display = 'none';
     // ratings are server-side; fill them in when they arrive
-    profile.ratingFor('rps-chess').then(r => {
+    profile.topRating().then(r => {
       if(!r || profile.account() !== acc) return;
+      const title = (GAMES.find(g => g.slug === r.game) || {}).title || r.game;
       $('profileStats').innerHTML =
-        '@' + acc.handle + ' · <b>' + r.rating + '</b> rating'
-        + (r.played ? ' · ' + r.played + ' played' : '');
+        '@' + acc.handle + ' · <b>' + r.rating + '</b> in ' + title
+        + (r.totalPlayed ? ' · ' + r.totalPlayed + ' played' : '');
     });
   }else{
     const t = profile.totals();
@@ -40,7 +41,11 @@ function renderProfile(){
 /* ---------- game grid ---------- */
 function card(g){
   return `<a class="gcard" href="${g.href}">
-    <div class="gcard__art">${g.art}</div>
+    <div class="gcard__art">
+      <img class="gcard__img" src="img/cards/${g.slug}.webp"
+           srcset="img/cards/${g.slug}.webp 1x, img/cards/${g.slug}@2x.webp 2x"
+           width="640" height="272" loading="lazy" decoding="async" alt="">
+    </div>
     <div class="gcard__bd">
       <h2 class="gcard__title display">${g.title}</h2>
       <p class="gcard__blurb">${g.blurb}</p>

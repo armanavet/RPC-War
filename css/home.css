@@ -2,11 +2,33 @@
    Homepage: a profile strip and the game grid. That is all it is.
    ============================================================ */
 
+/* ---------- what this place is ----------
+   The page used to open on "Guest · no games yet", which tells a first
+   visitor nothing about the site and everything about their own empty
+   record. The sentence comes first now; the profile strip follows it. */
+.hero{
+  padding:44px 0 30px;
+  max-width:34rem;
+}
+.hero__t{
+  font-size:clamp(30px,5.2vw,44px);
+  line-height:1.08;
+  margin:0 0 12px;
+  text-wrap:balance;
+}
+.hero__s{
+  margin:0;
+  font-size:16.5px;
+  color:var(--text-2);
+  line-height:1.6;
+}
+.hero__meta{margin-top:16px;min-height:20px}
+
 /* ---------- profile strip ---------- */
 .me{
   display:flex;align-items:center;gap:14px;
-  padding:16px 18px;
-  margin:26px 0 34px;
+  padding:14px 16px;
+  margin:0 0 34px;
 }
 .me__who{min-width:0;flex:1}
 .me__name{font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -14,7 +36,7 @@
 .me .btn{flex:none}
 
 /* ---------- games ---------- */
-.h-games{font-size:19px;margin-bottom:14px}
+.h-games{font-size:21px;margin-bottom:14px}
 
 .grid{
   display:grid;
@@ -22,27 +44,49 @@
   gap:16px;
 }
 
+/* A card is a boxed game on a shelf: card stock, a warm edge, and it
+   lifts a little when you reach for it. */
 .gcard{
   display:flex;flex-direction:column;
   background:var(--surface);
   border:1px solid var(--line);
   border-radius:var(--r-lg);
   overflow:hidden;
-  transition:border-color var(--fast),box-shadow var(--fast);
+  box-shadow:var(--shadow);
+  transition:border-color var(--fast),box-shadow var(--med),transform var(--med);
 }
-a.gcard:hover{border-color:var(--line-2);box-shadow:var(--shadow-md)}
+a.gcard:hover{
+  border-color:var(--line-2);
+  box-shadow:var(--shadow-lg);
+  transform:translateY(-3px);
+}
+@media (prefers-reduced-motion: reduce){
+  .gcard,a.gcard:hover{transition:none;transform:none}
+}
 
 
+/* The painted board is the card. It runs edge to edge with no padding —
+   an illustration inset in a grey panel reads as a screenshot, not as a
+   game you might want to play. width/height are set on the <img> so the
+   grid never reflows when a lazy image arrives. */
 .gcard__art{
-  padding:16px 18px 12px;
   background:var(--surface-2);
   border-bottom:1px solid var(--line);
+  overflow:hidden;
+}
+.gcard__img{
+  display:block;width:100%;height:auto;aspect-ratio:640/272;object-fit:cover;
+  transition:transform var(--med);
+}
+.gcard:hover .gcard__img{transform:scale(1.03)}
+@media (prefers-reduced-motion: reduce){
+  .gcard__img,.gcard:hover .gcard__img{transition:none;transform:none}
 }
 .gcard__art svg{width:100%;height:auto;max-width:200px;margin:0 auto}
 
-.gcard__bd{display:flex;flex-direction:column;flex:1;padding:14px 16px 16px}
+.gcard__bd{display:flex;flex-direction:column;flex:1;padding:14px 17px 16px}
 .gcard__top{display:flex;align-items:center;gap:10px;margin-bottom:5px}
-.gcard__title{font-size:16px;flex:1}
+.gcard__title{font-size:19px;flex:1;margin-bottom:2px}
 .gcard__blurb{margin:0;color:var(--text-2);font-size:13.5px;line-height:1.5}
 
 .gcard__foot{
@@ -57,11 +101,14 @@ a.gcard:hover{border-color:var(--line-2);box-shadow:var(--shadow-md)}
 .gcard__foot .btn{margin-left:auto}
 
 /* ---------- narrow screens ---------- */
-@media (max-width:560px){
-  .wrap{padding:0 16px}
-  .me{margin:18px 0 26px;padding:14px}
+@media (max-width:480px){
+  .hero{padding:30px 0 22px}
+  .me{margin:0 0 24px;padding:13px}
 }
 
 /* "Games" and the online count share a baseline */
 .games-hd{display:flex; align-items:baseline; gap:10px; margin-bottom:14px}
 .games-hd .h-games{margin-bottom:0}
+
+/* The grid gets a touch more room now that each card carries a painting. */
+.grid{grid-template-columns:repeat(auto-fill,minmax(288px,1fr));gap:20px}

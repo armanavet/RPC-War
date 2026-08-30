@@ -13,15 +13,18 @@ import {mountAuthBar} from './authbar.js';
 import {mountAds} from './ads.js';
 
 const $ = id => document.getElementById(id);
+const titleOf = slug => (GAMES.find(g => g.slug === slug) || {}).title || slug;
 const esc = t => String(t).replace(/[&<>"]/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const GAME = GAMES[0].slug;
-
+/* Neutral wording: this table mixes all four games, so it cannot use any
+   one game's phrasing the way the in-game banner does. */
 const REASONS = {
   backrow: 'reached the back row',
+  anvil:   'held the anvil',
   wipeout: 'no pieces left',
   nomoves: 'no legal moves',
+  capped:  'move limit',
   resign:  'resignation',
   invalid: 'illegal move',
   abandon: 'abandoned',
@@ -70,14 +73,20 @@ async function run(){
   $('pName').textContent = name;
   $('pHandle').textContent = '@' + who.handle + (who.is_guest ? ' · guest' : '');
 
-  // rating summary
-  const {data: r} = await sb.from('ratings')
-    .select('rating,played,wins,losses,draws').eq('user_id', who.id).eq('game', GAME).maybeSingle();
+  /* Rating summary. The history below spans every game, so these totals
+     do too — showing one game's record above an all-games list read as a
+     bug. The headline rating is the game this player has actually played
+     the most, named so the number means something. */
+  const {data: rs} = await sb.from('ratings')
+    .select('game,rating,played,wins,losses,draws').eq('user_id', who.id);
+  const all = rs || [];
+  const top = all.slice().sort((a, b) => (b.played - a.played) || (b.rating - a.rating))[0];
+  const sum = k => all.reduce((n, x) => n + (x[k] || 0), 0);
   const cells = [
-    ['Rating', r ? r.rating : '—'],
-    ['Played', r ? r.played : 0],
-    ['Won',    r ? r.wins : 0],
-    ['Lost',   r ? r.losses : 0],
+    [top ? titleOf(top.game) : 'Rating', top ? top.rating : '—'],
+    ['Played', sum('played')],
+    ['Won',    sum('wins')],
+    ['Lost',   sum('losses')],
   ];
   $('pStats').innerHTML = cells.map(([k, v]) =>
     `<div class="stat"><dt>${k}</dt><dd class="tnum">${v}</dd></div>`).join('');
@@ -121,6 +130,7 @@ async function run(){
 
     return `<tr>
       <td><span class="tag tag--${outcome}">${label}</span></td>
+      <td class="lb__wide muted">${esc(titleOf(m.game))}</td>
       <td>${opp ? `<a class="hist__opp" href="./?h=${esc(opp.handle)}">${esc(oppName)}</a>`
                 : esc(oppName)}</td>
       <td class="lb__num tnum">${d}</td>

@@ -13,6 +13,7 @@ const mp = createSync({
   reasons: {
     wipeout: 'ground down',
     nomoves: 'no stack left to move',
+    capped:  'neither side could grind the other down',
   },
 });
 

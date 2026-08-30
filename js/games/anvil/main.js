@@ -11,6 +11,7 @@ import * as ui from './ui.js';
 import * as mp from './sync.js';
 import * as profile from '../../site/profile.js';
 import {mountAuthBar} from '../../site/authbar.js';
+import {mountRailTabs} from '../../site/railtabs.js';
 import {mountAds} from '../../site/ads.js';
 import {startPresence} from '../../net/presence.js';
 
@@ -114,6 +115,7 @@ ui.$('aiOn').addEventListener('change', () => { if(!game.over) maybeAI(); });
 
 /* ---------- go ---------- */
 mountAuthBar();
+mountRailTabs();   // phones get the rail as tabs, not a long scroll
 mountAds();
 newGame();
 mp.autoJoinFromHash();

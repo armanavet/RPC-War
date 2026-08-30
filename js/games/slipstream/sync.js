@@ -15,6 +15,7 @@ const mp = createSync({
   reasons: {
     wipeout: 'no pieces left',
     nomoves: 'nowhere left to slide',
+    capped:  'neither side could finish it',
   },
 });
 

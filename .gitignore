@@ -5,3 +5,6 @@ supabase/.temp/
 .DS_Store
 Thumbs.db
 *.swp
+
+# asset tooling only (tools/make-sprites.mjs); never shipped
+node_modules/

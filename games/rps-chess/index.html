@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1D2126" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <title>RPS Chess — Oddboards</title>
 <meta name="description" content="Kings-only chess where every capture is rock, paper, scissors.">
 <link rel="stylesheet" href="../../css/tokens.css">
@@ -109,7 +116,7 @@
         </section>
 
         <section class="panel" id="cardMp">
-          <div class="panel__hd"><h2 class="eyebrow">Play a friend</h2></div>
+          <div class="panel__hd"><h2 class="eyebrow">Play online</h2></div>
           <div class="panel__bd">
             <div id="mpIdle">
               <button class="btn btn--primary btn--block" id="btnRanked">Play ranked</button>

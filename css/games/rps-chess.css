@@ -40,12 +40,15 @@
 .mini.r{background:var(--red)}
 
 /* ---------- board ---------- */
+/* The board sits in a mat inside the card, the way a printed board sits
+   inside a box lid. The inset shadow is what stops the playing surface
+   reading as a flat CSS grid pasted onto the page. */
 .boardbox{
   position:relative;
-  background:var(--surface);
+  background:linear-gradient(180deg, var(--surface-2), var(--surface-3));
   border-left:1px solid var(--line);
   border-right:1px solid var(--line);
-  padding:0;
+  padding:10px;
 }
 .board{
   position:relative;width:100%;aspect-ratio:1/1;
@@ -54,6 +57,11 @@
   touch-action:none;          /* the board handles drags, not the scroller */
   user-select:none;
   -webkit-user-select:none;
+  /* Without this, resting a finger on a piece pops the iOS copy /
+     share callout in the middle of a drag. */
+  -webkit-touch-callout:none;
+  /* A drag that starts on the top row must not become a page pull. */
+  overscroll-behavior:contain;
 }
 .cells{position:absolute;inset:0;display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr)}
 
@@ -89,14 +97,14 @@
   position:absolute;width:11.111%;height:11.111%;
   transition:left .18s var(--ease),top .18s var(--ease),opacity .2s,transform .2s;
 }
+/* The token is a painted image now, not a coloured circle with a glyph
+   in it. drop-shadow follows the token's actual silhouette, which a
+   box-shadow on a square element cannot do. */
 .pc .disc{
-  position:absolute;inset:10%;
-  border-radius:50%;
-  display:grid;place-items:center;
-  box-shadow:0 1px 2px rgba(16,24,40,.3);
+  position:absolute;inset:4%;
+  background:center/contain no-repeat;
+  filter:drop-shadow(0 1px 2px rgba(16,24,40,.30));
 }
-.pc.b .disc{background:var(--blue)}
-.pc.r .disc{background:var(--red)}
 .pc svg{width:60%;height:60%;color:#fff}
 .pc.gone{opacity:0;transform:scale(.5)}
 .pc.born{animation:pop .2s var(--ease)}
@@ -171,7 +179,7 @@
 
 /* ---------- move log ---------- */
 .log{
-  max-height:150px;overflow:auto;
+  max-height:150px;overflow:auto;overscroll-behavior:contain;
   font-family:var(--font-mono);font-size:12px;line-height:1.8;
   color:var(--text-2);
 }
@@ -182,7 +190,7 @@
 
 /* ---------- chat ---------- */
 .chatlog{
-  max-height:180px;overflow:auto;
+  max-height:180px;overflow:auto;overscroll-behavior:contain;
   display:flex;flex-direction:column;gap:5px;
   margin-bottom:10px;font-size:13px;
 }
@@ -237,13 +245,130 @@
 .legend__m--bad{background:var(--bad)}
 
 /* ---------- narrow screens ---------- */
+/* 920, not the 1024 step on the scale: the switch point is set by the
+   300px rail, and a 1000px tablet still has room for a 678px board
+   beside it. Stacking there would waste half the screen. */
 @media (max-width:920px){
   .game__layout{grid-template-columns:1fr;gap:16px}
   .rail{flex-direction:row;flex-wrap:wrap}
   .rail > *{flex:1 1 280px}
+
+  /* Size the board against the screen's *height*, not its width.
+     A square sized from width alone runs off the bottom of a phone,
+     so you scroll to see your own back rank. The floor stops it
+     collapsing on a very short landscape window. */
+  .boardcol{
+    /* width:100% is load-bearing: auto inline margins cancel a grid
+       item's default stretch, and without it the column shrinks to
+       its content instead of filling the screen. */
+    width:100%;
+    max-width:max(280px, calc(100dvh - var(--game-chrome)));
+    margin-inline:auto;
+  }
 }
-@media (max-width:560px){
+@media (max-width:480px){
   .statusbar{flex-wrap:wrap}
   .statusbar__hint{margin-left:0;width:100%;text-align:left}
   .rail{flex-direction:column}
+}
+
+
+/* A game page carries a Rules button the other pages do not, and at
+   375px that is one item too many. Leaderboard is the one to drop —
+   it is navigation you can reach from home, while Rules is something
+   you want mid-game without leaving the board. */
+@media (max-width:480px){
+  .nav a[href$="leaderboard/"]{display:none}
+}
+
+/* printed surface, pressed into its mat */
+.board{
+  border-radius:var(--r-sm);
+  box-shadow:inset 0 0 0 1px rgba(72,54,28,.13),
+             inset 0 3px 10px rgba(72,54,28,.10);
+}
+
+
+/* ============================================================
+   The rail as tabs (phones only; js/site/railtabs.js).
+   ============================================================ */
+.railtabs{display:none}
+
+@media (max-width:768px) and (orientation:portrait){
+  /* The wider breakpoint turns .rail into a wrapping *row* with
+     flex:1 1 280px on every child. Left alone that stretched the tab
+     bar to the height of the tallest panel — a 280px lozenge. Tabs
+     put the rail back into a column and stop anything growing. */
+  .rail--tabs{flex-direction:column;gap:0;align-items:stretch}
+  .rail--tabs > *{flex:0 0 auto}
+
+  /* The bar sticks to the top of the rail so the controls stay in
+     reach while the panel below it scrolls. */
+  .railtabs{
+    display:flex;
+    position:sticky;
+    top:calc(var(--topbar-h) + var(--safe-t));   /* under the sticky top bar */
+    z-index:20;
+    gap:4px;
+    padding:6px;
+    margin-bottom:12px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:var(--r-pill);
+    box-shadow:var(--shadow);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .railtabs::-webkit-scrollbar{display:none}
+
+  .railtabs__t{
+    flex:1 1 auto;
+    min-height:38px;
+    padding:8px 12px;
+    border:0;
+    border-radius:var(--r-pill);
+    background:transparent;
+    color:var(--text-2);
+    font-family:var(--font-display);
+    font-size:15px;font-weight:600;
+    white-space:nowrap;
+    cursor:pointer;
+    touch-action:manipulation;
+    transition:background var(--fast),color var(--fast);
+  }
+  .railtabs__t[aria-selected="true"]{
+    background:var(--surface);
+    color:var(--text);
+    box-shadow:var(--shadow);
+  }
+  .railtabs__t:active{background:var(--surface-3)}
+
+  /* !important is deliberate and load-bearing: it has to outrank the
+     app's own inline display on a panel without overwriting it, so the
+     app stays the only thing that decides whether a panel exists. */
+  .rail--tabs > .panel[data-tab="off"]{display:none !important}
+
+  /* One panel at a time, full width. */
+  .rail--tabs > .panel{width:100%}
+}
+
+/* ============================================================
+   Landscape on a phone.
+
+   Height is the scarce axis, and the board is sized against it — so
+   the page furniture has to give some back or the board shrinks to
+   nothing. The title and its margins go first; they are the least
+   useful pixels on the screen while a game is in progress.
+   ============================================================ */
+@media (orientation:landscape) and (max-height:560px){
+  .game{padding-top:10px}
+  .game__hd{margin-bottom:8px}
+  .game__title{font-size:17px}
+
+  /* Sideways there is width to spare and no height at all, so the rail
+     goes back beside the board and the board is capped by the screen. */
+  .game__layout{grid-template-columns:minmax(0,1fr) minmax(230px,290px);gap:14px}
+  .rail{flex-direction:column}
+  .rail > *{flex:0 0 auto}
+  .boardcol{max-width:max(190px, calc(100dvh - 140px))}
 }

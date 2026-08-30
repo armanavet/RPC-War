@@ -5,29 +5,44 @@
 .lb__hd .h-games{margin:0}
 .lb__pick{margin-left:auto;width:auto;min-width:180px}
 
-.lb{width:100%;border-collapse:collapse;font-size:14px}
-.lb th{
-  text-align:left;font-size:11.5px;font-weight:600;
-  color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;
-  padding:11px 14px;border-bottom:1px solid var(--line);
+.lb{width:100%;border-collapse:collapse;font-size:14.5px}
+.lb thead th{
+  text-align:left;font-size:11px;font-weight:600;
+  color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;
+  padding:12px 14px;border-bottom:1px solid var(--line);
+  background:linear-gradient(var(--surface-2), var(--surface));
 }
-.lb td{padding:10px 14px;border-bottom:1px solid var(--line)}
+.lb td{padding:12px 14px;border-bottom:1px solid var(--line)}
 .lb tr:last-child td{border-bottom:0}
 .lb tbody tr:hover{background:var(--surface-2)}
 
-.lb__rank{width:52px;color:var(--text-3)}
+/* Rank reads as a printed position, not a table index. */
+.lb__rank{
+  width:56px;color:var(--text-2);
+  font-family:var(--font-display);font-size:17px;
+}
+/* the top three carry the accent, the rest stay quiet */
+.lb tbody tr:nth-child(-n+3) .lb__rank{color:var(--accent);font-weight:600}
 .lb__num{text-align:right;width:74px}
 .lb__who{display:flex;align-items:center;gap:10px;min-width:0}
 a.lb__who:hover .lb__name{text-decoration:underline;text-underline-offset:2px}
-.lb__name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb__name{
+  font-family:var(--font-display);font-size:16px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
 .lb__handle{color:var(--text-3);font-size:12.5px;white-space:nowrap}
 .lb__loading{color:var(--text-3);padding:18px 14px}
 .lb__empty{margin:0;padding:22px 14px;color:var(--text-3);font-size:14px}
 .lb__note{margin:14px 0 0;font-size:12.5px;color:var(--text-3)}
 
-@media (max-width:620px){
+@media (max-width:480px){
   .lb__wide{display:none}
   .lb__handle{display:none}
   .lb__hd{flex-wrap:wrap}
   .lb__pick{margin-left:0;width:100%}
 }
+
+/* Both tables already sit in a .panel, which now carries the card stock
+   and a rounded edge — so the header row has to be clipped to it, or the
+   tinted thead squares off the panel's top corners. */
+.panel:has(> .lb){overflow:hidden}

@@ -205,7 +205,10 @@ function drawPieces(){
     if(!el){
       el = document.createElement('div');
       el.className = 'pc ' + (col(p) === BLUE ? 'b' : 'r') + ' born';
-      el.innerHTML = '<div class="disc">' + SVG[typ(p)] + '</div>';
+      /* Sheet 1, keyed and sliced by tools/make-sprites.mjs. Row 0 is
+         blue, row 1 red; columns are rock, paper, scissors. */
+      const sprite = `../../img/1/r${col(p) === BLUE ? 0 : 1}c${typ(p)}.webp`;
+      el.innerHTML = '<div class="disc" style="background-image:url(' + sprite + ')"></div>';
       pcEl.appendChild(el);
       pcEls.set(id, el);
     }
@@ -352,9 +355,22 @@ export function renderMpPanels(){
   $('chatIn').disabled    = !net.ready;
   $('chatIn').placeholder = net.ready ? 'Message…' : 'Waiting for your friend…';
 
+  /* The idle panel offers both a random ranked opponent and an invite
+     link, so it cannot be called "Play a friend" — that named half of
+     what is in it and left Play ranked looking misfiled. */
   const head = $('cardMp').querySelector('.eyebrow');
   if(head) head.textContent = online ? (net.rated ? 'Rated match' : 'Friendly match')
-                                     : 'Play a friend';
+                                     : 'Play online';
+
+  /* Ranked needs a real account. Say so on the button instead of
+     letting the server refusal be the first anyone hears of it. */
+  const ranked = $('btnRanked'), note = $('rankedNote');
+  if(ranked && note){
+    ranked.disabled = !net.canRank;
+    note.textContent = net.canRank
+      ? 'Random opponent, rating on the line.'
+      : 'Sign in to play ranked. Game links work without an account.';
+  }
 
   if(online && net.ready){
     const you = 1 - net.side;

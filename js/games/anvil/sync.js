@@ -14,6 +14,7 @@ const mp = createSync({
     anvil:   'held the anvil',
     wipeout: 'shoved into the sea',
     nomoves: 'no move left',
+    capped:  'neither side could take the middle',
   },
 });
 

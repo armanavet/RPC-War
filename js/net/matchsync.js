@@ -39,6 +39,7 @@ const SEAT_A = 0, SEAT_B = 1;
 const BASE_REASONS = {
   wipeout: 'no pieces left',
   nomoves: 'no legal moves',
+  capped:  'the move limit',
   resign:  'resigned',
   invalid: 'an illegal move was played',
   abandon: 'abandoned the game',
@@ -57,6 +58,25 @@ export function createSync({slug, state, ui, reasons}){
   let queueTimer = null;
 
   const myId = () => (T.me() || {}).id || null;
+
+  /* find_match refuses guests outright ("ranked play needs an account"),
+     so the button has to know before it is pressed — otherwise the only
+     feedback is a raw server error in the panel. */
+  let rankKnown = false;
+  function syncCanRank(){
+    const a = auth.authState();
+    const next = !!(a.signedIn && !a.isGuest);
+    /* The first pass must paint even though nothing changed: net.canRank
+       starts false and a signed-out visitor never moves it, so an
+       equality guard alone would leave the button in whatever state the
+       static markup shipped with. */
+    if(rankKnown && next === net.canRank) return;
+    rankKnown = true;
+    net.canRank = next;
+    ui.renderMpPanels();
+  }
+  auth.onAuth(syncCanRank);
+  syncCanRank();
   const fail = e => ui.mpErr((e && e.message) || String(e));
 
   /* A guest's profile is born called "Guest 1A2B". If this browser already

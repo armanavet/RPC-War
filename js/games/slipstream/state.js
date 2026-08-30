@@ -76,7 +76,12 @@ export function move(mv, fromNet){
     game.ply + '. <span class="' + side + '">' + sq(from) + '&rarr;' + sq(to) + '</span>' + tag);
 
   const nB = count(game.bd, BLUE), nR = count(game.bd, RED);
-  if(nR === 0) game.over = {w: BLUE, why: 'no pieces left'};
+  // A closing ring crushes both colours at once, so the last piece on
+  // each side can go together. finish-match calls that a draw; without
+  // this line the board would announce blue the winner and then be
+  // overruled by the server.
+  if(nB === 0 && nR === 0) game.over = {w: -1, why: 'both sides crushed'};
+  else if(nR === 0) game.over = {w: BLUE, why: 'no pieces left'};
   else if(nB === 0) game.over = {w: RED, why: 'no pieces left'};
 
   game.turn = 1 - game.turn;

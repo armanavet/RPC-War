@@ -7,7 +7,12 @@
 html,body{margin:0;padding:0}
 img,svg{display:block;max-width:100%}
 button,input,select,textarea{font:inherit;color:inherit}
-html{-webkit-text-size-adjust:100%}
+html{
+  -webkit-text-size-adjust:100%;
+  /* iOS paints a grey box over anything tappable. We draw our own
+     :active states below, which respond faster and look deliberate. */
+  -webkit-tap-highlight-color:transparent;
+}
 
 body{
   background:var(--page);
@@ -16,6 +21,10 @@ body{
   font-size:15px;
   line-height:1.55;
   min-height:100vh;
+  /* 100vh on iOS is the *large* viewport — the one that assumes the
+     Safari toolbar is hidden — so the last 60-odd pixels sit under the
+     toolbar until you scroll. dvh tracks what is actually visible. */
+  min-height:100dvh;
   display:flex;
   flex-direction:column;
   -webkit-font-smoothing:antialiased;
@@ -31,12 +40,21 @@ body{
 
 a{color:inherit;text-decoration:none}
 
-.wrap{width:100%;max-width:1120px;margin:0 auto;padding:0 24px}
+.wrap{
+  width:100%;max-width:1120px;margin:0 auto;
+  padding-left:calc(24px + var(--safe-l));
+  padding-right:calc(24px + var(--safe-r));
+}
 .stack{flex:1 0 auto}
 
 /* ---------- type ---------- */
 h1,h2,h3{margin:0;font-weight:600;line-height:1.25}
-.display{font-weight:650;letter-spacing:-.01em}
+.display{
+  font-family:var(--font-display);
+  font-weight:600;
+  letter-spacing:0;          /* an old-style serif needs no tightening */
+  font-feature-settings:'liga' 1;
+}
 
 .eyebrow{
   font-size:12px;
@@ -52,12 +70,16 @@ h1,h2,h3{margin:0;font-weight:600;line-height:1.25}
   border-bottom:1px solid var(--line);
   background:var(--surface);
   position:sticky;top:0;z-index:40;
+  padding-top:var(--safe-t);      /* clears the notch in landscape */
 }
 .topbar__in{display:flex;align-items:center;gap:22px;height:58px}
 
 .brand{display:flex;align-items:center;gap:9px;flex:none}
 .brand__mark{width:24px;height:24px;flex:none}
-.brand__name{font-size:16.5px;font-weight:650;letter-spacing:-.01em}
+.brand__name{
+  font-family:var(--font-display);
+  font-size:18px;font-weight:600;letter-spacing:0;
+}
 
 .nav{display:flex;align-items:center;gap:2px}
 .nav a{
@@ -85,8 +107,11 @@ h1,h2,h3{margin:0;font-weight:600;line-height:1.25}
 .chipbtn[disabled]{opacity:.6;cursor:default}
 .chipbtn .avatar{margin:-1px 0}
 @media (max-width:560px){
-  #navName{display:none}
-  .chipbtn{padding:4px}
+  /* Avatar-only chip on phones — but only when there is an avatar.
+     Signed out there is none, and hiding the label too left a blank
+     capsule with no way to guess it meant "Sign in". */
+  .chipbtn:not(.chipbtn--anon) #navName{display:none}
+  .chipbtn:not(.chipbtn--anon){padding:4px}
 }
 
 /* the account menu that drops out of the top bar */
@@ -126,38 +151,59 @@ h1,h2,h3{margin:0;font-weight:600;line-height:1.25}
   border-radius:var(--r-sm);
   background:var(--surface);
   color:var(--text);
-  font-size:14px;font-weight:500;
+  font-size:14px;font-weight:550;
   cursor:pointer;
   white-space:nowrap;
-  transition:background var(--fast),border-color var(--fast);
+  /* A one-pixel light edge along the top and a warm shadow underneath:
+     enough to read as a physical counter you press, without tipping
+     into a skeuomorphic bevel. */
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.65), var(--shadow);
+  transition:background var(--fast),border-color var(--fast),
+             box-shadow var(--fast),transform var(--fast);
 }
-.btn:hover{background:var(--surface-2)}
+.btn:hover{background:var(--surface-2);border-color:var(--line-2)}
+.btn:active{transform:translateY(1px);box-shadow:inset 0 1px 2px rgba(72,54,28,.16)}
 .btn[disabled],.btn[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
 
 .btn--primary{
   background:var(--accent);
-  border-color:var(--accent);
+  border-color:var(--accent-hover);
   color:var(--accent-fg);
   font-weight:600;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), var(--shadow);
 }
 .btn--primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
 
-.btn--ghost{background:transparent}
-.btn--ghost:hover{background:var(--surface-2)}
+.btn--ghost{background:transparent;box-shadow:none}
+.btn--ghost:hover{background:var(--surface-2);box-shadow:none}
 
 .btn--sm{padding:6px 11px;font-size:13px}
 .btn--block{width:100%}
 
 /* ---------- panels ---------- */
+/* Panels are card stock: warm ground, hairline rule, a little lift.
+   The header is set in the display serif rather than the small grey
+   uppercase it used to be — it reads as a section of a rulebook. */
 .panel{
   background:var(--surface);
   border:1px solid var(--line);
   border-radius:var(--r);
+  box-shadow:var(--shadow);
 }
 .panel__hd{
   display:flex;align-items:center;gap:10px;
-  padding:11px 14px;
+  padding:12px 15px 10px;
   border-bottom:1px solid var(--line);
+  background:linear-gradient(var(--surface-2), var(--surface));
+  border-radius:var(--r) var(--r) 0 0;
+}
+/* The panel titles are marked up as .eyebrow, which is small grey caps
+   everywhere else on the site. Inside a panel header they are the
+   section title, so they get the display face at reading size. */
+.panel__hd .eyebrow{
+  font-family:var(--font-display);
+  font-size:15.5px;font-weight:600;letter-spacing:0;
+  color:var(--text);
 }
 .panel__bd{padding:14px}
 .panel__bd--tight{padding:10px 14px}
@@ -204,7 +250,9 @@ h1,h2,h3{margin:0;font-weight:600;line-height:1.25}
   border-radius:var(--r-sm);
   padding:8px 10px;
   color:var(--text);
-  font-size:14px;
+  /* Never below 16px. iOS zooms the whole page in on focus for any
+     smaller input and does not zoom back out afterwards. */
+  font-size:16px;
   transition:border-color var(--fast),box-shadow var(--fast);
 }
 .field::placeholder{color:var(--text-3)}
@@ -240,7 +288,7 @@ select.field{
   flex:none;
   border-top:1px solid var(--line);
   margin-top:56px;
-  padding:22px 0 30px;
+  padding:22px 0 calc(30px + var(--safe-b));   /* clears the home indicator */
   color:var(--text-3);
   font-size:13px;
 }
@@ -251,7 +299,9 @@ select.field{
 /* ---------- modal ---------- */
 .modal{
   position:fixed;inset:0;z-index:60;
-  display:none;align-items:center;justify-content:center;padding:20px;
+  display:none;align-items:center;justify-content:center;
+  padding:calc(20px + var(--safe-t)) calc(20px + var(--safe-r))
+          calc(20px + var(--safe-b)) calc(20px + var(--safe-l));
   background:rgba(16,20,26,.5);
 }
 .modal.on{display:flex}
@@ -295,4 +345,58 @@ select.field{
 @keyframes livePulse{
   0%,100%{box-shadow:0 0 0 3px var(--accent-tint)}
   50%    {box-shadow:0 0 0 5px transparent}
+}
+
+
+/* ============================================================
+   Touch.
+
+   Everything below is gated on a coarse pointer, so the desktop UI
+   keeps its density and only fingers get the bigger targets.
+   ============================================================ */
+/* No double-tap-to-zoom wait on anything you press. */
+button,.btn,.chipbtn,.nav a,select,label{touch-action:manipulation}
+
+@media (pointer:coarse){
+  .btn,.chipbtn,.nav a{min-height:var(--tap)}
+  .field{min-height:var(--tap)}
+
+  /* We turned the native tap flash off, so every control needs a
+     visible press of its own — without one the UI feels dead on a
+     phone, which reads as a slow site rather than a silent one. */
+  .btn:active,.chipbtn:active{background:var(--surface-3)}
+  .nav a:active{background:var(--surface-2)}
+}
+@media (pointer:coarse) and (prefers-reduced-motion: no-preference){
+  .btn:active,.chipbtn:active{transform:scale(.97)}
+}
+
+/* Anything that scrolls inside the page keeps its scrolling to
+   itself: no chaining to the document, and no pull-to-refresh
+   firing because a list happened to be at the top. */
+.scrolls{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+
+/* ============================================================
+   Narrow top bar.
+
+   Brand + nav + a Rules button + the account chip never fitted a
+   375px screen, so the whole document scrolled sideways on a phone.
+   The wordmark goes (the mark still reads as the brand and still
+   links home) and the spacing tightens.
+   ============================================================ */
+/* Who you are must never be squeezed out of the bar: the chip shrank
+   to a 15px empty capsule at 375px because flex let it. */
+.topbar__end{flex:none}
+.chipbtn{flex:none}
+
+@media (max-width:480px){
+  :root{--topbar-h:54px}
+  .topbar__in{gap:8px;height:54px}
+  .brand__name{display:none}
+  .nav{gap:0}
+  .nav a{padding:6px 8px;font-size:13.5px}
+  .topbar__end{gap:6px}
+  .chipbtn{padding:4px 9px 4px 4px;font-size:13.5px;max-width:9.5rem}
+  .chipbtn > span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:3.2rem}
 }

@@ -11,18 +11,21 @@
 :root{
   color-scheme: light;
 
-  /* --- surfaces --- */
-  --page:       #F6F7F9;
-  --surface:    #FFFFFF;
-  --surface-2:  #F1F3F5;   /* insets, inputs */
-  --surface-3:  #E6E9ED;   /* hover */
-  --line:       #E3E6EA;
-  --line-2:     #CBD1D8;
+  /* --- surfaces ---
+     Warm, not cool. The old neutrals were blue-grey, which is what made
+     a site full of painted wooden pieces still read as software. These
+     are paper and card: the same tones the box lid is printed on. */
+  --page:       #F4F0E7;   /* the table */
+  --surface:    #FFFCF6;   /* card stock */
+  --surface-2:  #EFE9DC;   /* insets, inputs */
+  --surface-3:  #E5DCC9;   /* hover */
+  --line:       #E2D9C7;
+  --line-2:     #CBBFA6;
 
-  /* --- text --- */
-  --text:       #1C2024;
-  --text-2:     #5C666F;
-  --text-3:     #8B949E;
+  /* --- text: warm near-black, never pure --- */
+  --text:       #241F19;
+  --text-2:     #6A6053;
+  --text-3:     #99907F;
 
   /* --- accent --- */
   --accent:      #1E7A4A;
@@ -40,10 +43,10 @@
   --red-hi:    #A33724;
   --red-tint:  rgba(199,70,47,.13);
 
-  /* --- board --- */
-  --board-lite: #E9EDF2;
-  --board-dark: #BCC6D2;
-  --wall:       #55606C;   /* must be obviously darker than board-dark */
+  /* --- board: printed linen, warm enough that maple sits on it --- */
+  --board-lite: #EBE2CE;
+  --board-dark: #CFC0A2;
+  --wall:       #7C6B52;   /* must be obviously darker than board-dark */
 
   /* --- fight outcomes --- */
   --good: #1E7A4A;
@@ -52,19 +55,31 @@
 
   /* --- type: whatever the reader's OS already uses --- */
   --font-ui:   system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Display face for headings, the wordmark and game titles.
+
+     A warm old-style serif, because the art direction is a boxed board
+     game rather than a tournament server. Every face here already ships
+     with the OS — Iowan Old Style on macOS and iOS, Palatino Linotype on
+     Windows, Georgia as the floor — so it costs zero bytes, needs no
+     third-party host, and paints on the first frame with no swap. That
+     is the same reasoning that kept Google Fonts out. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua',
+                  Palatino, Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* --- shape --- */
-  --r-xs: 3px;
-  --r-sm: 6px;
-  --r:    8px;
-  --r-lg: 12px;
+  --r-xs: 4px;
+  --r-sm: 8px;
+  --r:    11px;
+  --r-lg: 16px;
   --r-pill: 999px;
 
   /* --- depth: used sparingly --- */
-  --shadow:    0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
-  --shadow-md: 0 4px 12px rgba(16,24,40,.10);
-  --shadow-lg: 0 12px 32px rgba(16,24,40,.16);
+  /* Shadows carry the warmth too — a blue-grey shadow under a wooden
+     token is the tell that gives away a "warm" palette. */
+  --shadow:    0 1px 2px rgba(72,54,28,.07), 0 1px 3px rgba(72,54,28,.09);
+  --shadow-md: 0 4px 14px rgba(72,54,28,.12);
+  --shadow-lg: 0 14px 36px rgba(72,54,28,.18);
 
   /* --- motion --- */
   --ease: cubic-bezier(.2,.7,.3,1);
@@ -73,16 +88,16 @@
 }
 
 :root[data-theme="dark"]{
-    --page:       #15181C;
-    --surface:    #1D2126;
-    --surface-2:  #23282E;
-    --surface-3:  #2C323A;
-    --line:       #2C3238;
-    --line-2:     #3C444D;
+    --page:       #191510;
+    --surface:    #221D17;
+    --surface-2:  #2A241C;
+    --surface-3:  #342D23;
+    --line:       #372F25;
+    --line-2:     #4C4234;
 
-    --text:       #E7EAEE;
-    --text-2:     #A2ACB6;
-    --text-3:     #79838E;
+    --text:       #EFE8DA;
+    --text-2:     #B2A794;
+    --text-3:     #877C6C;
 
     --accent:      #3FA972;
     --accent-hover:#4CBB81;
@@ -97,9 +112,9 @@
     --red-hi:    #EE9077;
     --red-tint:  rgba(214,90,65,.18);
 
-    --board-lite: #495663;
-    --board-dark: #3A444F;
-    --wall:       #171C22;
+    --board-lite: #4A4133;
+    --board-dark: #362F25;
+    --wall:       #14100C;
 
     --good: #3FA972;
     --even: #D2A03F;
@@ -116,4 +131,42 @@
     animation-iteration-count:1 !important;
     transition-duration:.01ms !important;
   }
+}
+
+/* ============================================================
+   Layout scale.
+
+   Breakpoints are written down rather than tokenised because CSS
+   cannot put a custom property inside a media query. Anything new
+   uses these four widths and no others:
+
+     480    phone, portrait
+     768    large phone / small tablet
+    1024    tablet / small laptop
+    1280    desktop
+
+   ============================================================ */
+:root{
+  /* Notched iOS. Zero everywhere else, so these are safe to add
+     unconditionally — the page just must not run under the notch
+     or the home indicator. Needs viewport-fit=cover in the meta
+     tag or env() resolves to 0 even on a notched device. */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+
+  /* The smallest thing a finger should have to hit. */
+  --tap: 44px;
+
+  /* The sticky top bar's height. Anything else that sticks has to sit
+     below it, and guessing the number in three stylesheets is how they
+     drift apart. Narrow screens override it. */
+  --topbar-h: 58px;
+
+  /* Roughly how much of a phone screen the game furniture eats:
+     top bar, title, both player bars, the status line and gaps.
+     The board is sized against what is left so it fits the screen
+     without scrolling. Tune here, not in four game stylesheets. */
+  --game-chrome: 260px;
 }

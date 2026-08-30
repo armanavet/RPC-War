@@ -11,6 +11,7 @@ import * as ui from './ui.js';
 import * as mp from './sync.js';
 import * as profile from '../../site/profile.js';
 import {mountAuthBar} from '../../site/authbar.js';
+import {mountRailTabs} from '../../site/railtabs.js';
 import {startPresence} from '../../net/presence.js';
 import {mountAds} from '../../site/ads.js';
 
@@ -118,6 +119,7 @@ ui.$('aiOn').addEventListener('change', () => { if(!game.over) maybeAI(); });
 
 /* ---------- go ---------- */
 mountAuthBar();
+mountRailTabs();   // phones get the rail as tabs, not a long scroll
 
 /* "3 here" — everyone on this screen, not just the two in this match.
    Match presence is a different thing entirely and lives in sync.js. */

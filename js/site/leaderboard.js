@@ -65,8 +65,23 @@ async function load(game){
   }
 }
 
+/* Remember which board you were looking at. With four games and one
+   picker, landing on someone else's default every time is a small
+   irritation that costs nothing to remove. */
+const PICK = 'ob.lb.game';
+function savedGame(){
+  let v = null;
+  try{ v = localStorage.getItem(PICK); }catch(e){}
+  return GAMES.some(g => g.slug === v) ? v : GAMES[0].slug;
+}
+
 fillGames();
-$('lbGame').addEventListener('change', e => load(e.target.value));
-load(GAMES[0].slug);
+$('lbGame').addEventListener('change', e => {
+  try{ localStorage.setItem(PICK, e.target.value); }catch(err){}
+  load(e.target.value);
+});
+const start = savedGame();
+$('lbGame').value = start;
+load(start);
 mountAuthBar();
 mountAds();

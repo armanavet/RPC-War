@@ -2,7 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1D2126" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <title>Oddboards — board games for two</title>
 <meta name="description" content="Board games for two. Play the computer, or send a friend a link.">
 <link rel="stylesheet" href="css/tokens.css">
@@ -40,6 +47,15 @@
 <main class="stack">
   <div class="wrap">
 
+    <section class="hero">
+      <h1 class="hero__t display">Odd little games for two.</h1>
+      <p class="hero__s">Four originals you can learn in half a minute and finish in five.
+        Play the computer, or send a friend a link — no account, no install.</p>
+      <div class="hero__meta">
+        <span class="live live--total" id="liveTotal" hidden></span>
+      </div>
+    </section>
+
     <section class="me panel" id="profile">
       <span class="avatar avatar--lg" id="profileAvatar">?</span>
       <div class="me__who">
@@ -50,8 +66,7 @@
     </section>
 
     <div class="games-hd">
-      <h1 class="h-games display">Games</h1>
-      <span class="live live--total" id="liveTotal" hidden></span>
+      <h2 class="h-games display">The games</h2>
     </div>
     <div class="grid" id="gameGrid"></div>
 

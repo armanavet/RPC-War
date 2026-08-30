@@ -336,9 +336,22 @@ export function renderMpPanels(){
   $('chatIn').disabled    = !net.ready;
   $('chatIn').placeholder = net.ready ? 'Message…' : 'Waiting for your friend…';
 
+  /* The idle panel offers both a random ranked opponent and an invite
+     link, so it cannot be called "Play a friend" — that named half of
+     what is in it and left Play ranked looking misfiled. */
   const head = $('cardMp').querySelector('.eyebrow');
   if(head) head.textContent = online ? (net.rated ? 'Rated match' : 'Friendly match')
-                                     : 'Play a friend';
+                                     : 'Play online';
+
+  /* Ranked needs a real account. Say so on the button instead of
+     letting the server refusal be the first anyone hears of it. */
+  const ranked = $('btnRanked'), note = $('rankedNote');
+  if(ranked && note){
+    ranked.disabled = !net.canRank;
+    note.textContent = net.canRank
+      ? 'Random opponent, rating on the line.'
+      : 'Sign in to play ranked. Game links work without an account.';
+  }
 
   if(online && net.ready){
     const you = 1 - net.side;

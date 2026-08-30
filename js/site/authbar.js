@@ -82,8 +82,12 @@ function render(state){
 
   closeMenu();
 
+  /* `--anon` tells the stylesheet there is no avatar to show. Phones
+     collapse this chip to the avatar alone, which leaves an empty
+     capsule when nobody is signed in — the class lets the label stay. */
   if(!state.ready){
     btn.disabled = true;
+    btn.classList.add('chipbtn--anon');
     av.style.display = 'none';
     nm.textContent = '…';
     return;
@@ -92,11 +96,13 @@ function render(state){
   btn.disabled = false;
   if(state.signedIn && !state.isGuest){
     const name = profile.displayName();
+    btn.classList.remove('chipbtn--anon');
     av.style.display = '';
     profile.paintAvatar(av, name);
     nm.textContent = name;
     btn.title = 'Account';
   }else{
+    btn.classList.add('chipbtn--anon');
     av.style.display = 'none';
     nm.textContent = 'Sign in';
     btn.title = 'Sign in';
