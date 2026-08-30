@@ -69,16 +69,28 @@ const ENGINES: Record<string, Engine> = {
   },
 };
 
-/* Log-normal-ish think time. Never a constant, never instant, and
-   occasionally a long one — people stare at boards. */
+/* Log-normal-ish think time. Never a constant, never instant, but never
+   long enough to make you wait either.
+
+   The first version of this had a median of 6.4s and put 31% of moves
+   over ten seconds, which is not a thoughtful opponent — it is a broken
+   one. Realism is not the goal on its own: a five-minute game cannot
+   afford a five-second pause per move.
+
+   `tempo_ms` is treated as how deliberate a persona is rather than as
+   milliseconds, so the personas already seeded keep their relative
+   character without anyone re-running the seeder. */
+const PACE = 0.4;
+
 function thinkMs(tempo: number, variance: number, choices: number){
   const u = Math.max(1e-6, Math.random()), v = Math.max(1e-6, Math.random());
   const gauss = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-  const busy = 0.6 + Math.min(1.6, choices / 26);        // more options, longer pause
-  let ms = tempo * busy * Math.exp(gauss * variance);
-  if(Math.random() < 0.07) ms *= 2.4;                     // the occasional long think
-  if(Math.random() < 0.10) ms *= 0.35;                    // and the occasional snap reply
-  return Math.round(Math.min(26000, Math.max(900, ms)));
+  const busy = 0.55 + Math.min(0.75, choices / 70);      // more options, longer pause
+  const spread = Math.min(0.42, variance);               // the old tail was far too fat
+  let ms = Math.min(tempo * PACE, 2000) * busy * Math.exp(gauss * spread);
+  if(Math.random() < 0.05) ms *= 1.9;                     // the occasional long think
+  if(Math.random() < 0.20) ms *= 0.45;                    // and the frequent snap reply
+  return Math.round(Math.min(6000, Math.max(320, ms)));
 }
 
 Deno.serve(async (req) => {
@@ -146,7 +158,10 @@ Deno.serve(async (req) => {
     if(!rErr) return json({ok: true, resigned: true});
   }
 
-  let mv = eng.best(bd, turn, job.depth, job.budget_ms);
+  /* The search runs *after* the pause, so its budget is latency you feel
+     on top of the think time. Capped here rather than in the seeder so
+     the bots already in the database get it without being re-created. */
+  let mv = eng.best(bd, turn, job.depth, Math.min(job.budget_ms, 900));
   /* Imperfection, scaled by persona: take something other than the best
      move now and then. Weak bots blunder in ways you can punish. */
   if(mv === undefined || mv === null || Math.random() < Number(job.blunder)){
