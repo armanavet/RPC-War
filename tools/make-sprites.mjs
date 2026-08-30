@@ -241,37 +241,11 @@ async function cutSheet(name, {tol = 48, pad = 0.06,
   return {cols: cols.length, rows: rows.length};
 }
 
-/* The card art is four finished illustrations in a 2x2 grid, no
-   keying wanted — just cut and size for the homepage cards. */
-async function cutCards(){
-  const file = path.join(SRC, '6.jpg');
-  const {width: w, height: h} = await sharp(file).metadata();
-  const names = ['rps-chess', 'slipstream', 'anvil', 'cairn'];
-  await mkdir(path.join(OUT, 'cards'), {recursive: true});
-  let i = 0;
-  for(let r = 0; r < 2; r++){
-    for(let c = 0; c < 2; c++){
-      const slug = names[i++];
-      for(const [suffix, width] of [['', 640], ['@2x', 1280]]){
-        await sharp(file)
-          .extract({left: c * (w >> 1), top: r * (h >> 1), width: w >> 1, height: h >> 1})
-          .resize({width, fit: 'cover'})
-          .webp({quality: 82, effort: 6})
-          .toFile(path.join(OUT, 'cards', `${slug}${suffix}.webp`));
-      }
-      console.log(`  card ${slug}`);
-    }
-  }
-}
 
 console.log('sheets:');
 /* Tolerances are per sheet because the grounds differ. Keep them tight:
    the lit rim of a maple token is only ~58 away from the board's white
    squares, and anything looser keys the rim off the piece. */
 await cutSheet('1', {tol: 60, erode: 2, warm: {dw: 16, dg: 12}});  // RPS Chess (checkerboard)
-await cutSheet('2', {tol: 60, erode: 2});   // Slipstream       (flat cream)
-await cutSheet('4', {tol: 104, erode: 3});  // Cairn stacks (grey slate: warmth trick cannot help)
 await cutSheet('7', {tol: 50, erode: 2});   // avatars          (flat near-white)
-console.log('cards:');
-await cutCards();
 console.log('done');

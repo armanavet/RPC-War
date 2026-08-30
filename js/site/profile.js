@@ -84,7 +84,7 @@ export function paintAvatar(el, name){
 /* Your rating for one game, or null when signed out. Ratings live on the
    server and no client can write them — see supabase/migrations/0004. */
 /* Every rating this account holds, strongest-first by how much it has
-   actually been played. With four games there is no single "your rating"
+   actually been played. With more than one game there is no single "your rating"
    any more, so callers show the one that represents the player best. */
 export async function topRating(){
   const acc = account();

@@ -65,7 +65,7 @@ async function load(game){
   }
 }
 
-/* Remember which board you were looking at. With four games and one
+/* Remember which board you were looking at. With several games and one
    picker, landing on someone else's default every time is a small
    irritation that costs nothing to remove. */
 const PICK = 'ob.lb.game';

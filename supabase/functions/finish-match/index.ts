@@ -18,9 +18,7 @@
    ============================================================ */
 import {createClient} from 'jsr:@supabase/supabase-js@2';
 import * as rps from '../_shared/rps-chess-rules.js';
-import * as slip from '../_shared/slipstream-rules.js';
 import * as anvil from '../_shared/anvil-rules.js';
-import * as cairn from '../_shared/cairn-rules.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -69,34 +67,6 @@ function replayRps(moves: number[]): Replay {
   return {kind: 'unfinished'};
 }
 
-/* ---------- Slipstream ----------
-   Mirrors js/games/slipstream/state.js. The ring timer is a pure
-   function of the move index, so the server needs nothing extra to
-   agree with the clients. */
-function replaySlipstream(moves: number[]): Replay {
-  let bd = slip.startBoard().b;
-  let turn = slip.BLUE;
-
-  for(let ply = 0; ply < moves.length; ply++){
-    const mv = moves[ply];
-    if(!slip.genMoves(bd, turn, ply).includes(mv)) return {kind: 'illegal', index: ply};
-
-    bd = slip.apply(bd, mv, ply).bd;
-    turn = 1 - turn;
-
-    const nB = slip.count(bd, slip.BLUE), nR = slip.count(bd, slip.RED);
-    if(nB === 0 && nR === 0) return {kind: 'over', result: 'draw', reason: 'wipeout'};
-    if(nR === 0) return {kind: 'over', result: 'blue', reason: 'wipeout'};
-    if(nB === 0) return {kind: 'over', result: 'red',  reason: 'wipeout'};
-    if(slip.genMoves(bd, turn, ply + 1).length === 0){
-      // the player to move is jammed, so the other one wins
-      return {kind: 'over', result: turn === slip.BLUE ? 'red' : 'blue', reason: 'nomoves'};
-    }
-    if(ply + 1 >= slip.PLY_CAP) return {kind: 'over', result: 'draw', reason: 'capped'};
-  }
-  return {kind: 'unfinished'};
-}
-
 /* ---------- Anvil ----------
    Mirrors js/games/anvil/state.js. The anvil is claimed at the start
    of a turn, so the check happens after the turn has passed. */
@@ -125,40 +95,9 @@ function replayAnvil(moves: number[]): Replay {
   return {kind: 'unfinished'};
 }
 
-/* ---------- Cairn ----------
-   Mirrors js/games/cairn/state.js. The board here is an array of
-   arrays, so `apply` is the only thing allowed to copy it. */
-function replayCairn(moves: number[]): Replay {
-  let bd = cairn.startBoard().b;
-  let turn = cairn.BLUE;
-
-  for(let ply = 0; ply < moves.length; ply++){
-    const mv = moves[ply];
-    if(!cairn.genMoves(bd, turn).includes(mv)) return {kind: 'illegal', index: ply};
-
-    bd = cairn.apply(bd, mv).bd;
-    turn = 1 - turn;
-
-    const nB = cairn.count(bd, cairn.BLUE), nR = cairn.count(bd, cairn.RED);
-    if(nR <= cairn.LOSE_AT || cairn.controls(bd, cairn.RED) === 0){
-      return {kind: 'over', result: 'blue', reason: 'wipeout'};
-    }
-    if(nB <= cairn.LOSE_AT || cairn.controls(bd, cairn.BLUE) === 0){
-      return {kind: 'over', result: 'red', reason: 'wipeout'};
-    }
-    if(cairn.genMoves(bd, turn).length === 0){
-      return {kind: 'over', result: turn === cairn.BLUE ? 'red' : 'blue', reason: 'nomoves'};
-    }
-    if(ply + 1 >= cairn.PLY_CAP) return {kind: 'over', result: 'draw', reason: 'capped'};
-  }
-  return {kind: 'unfinished'};
-}
-
 const VERIFIERS: Record<string, (m: number[]) => Replay> = {
   'rps-chess': replayRps,
-  'slipstream': replaySlipstream,
   'anvil': replayAnvil,
-  'cairn': replayCairn,
 };
 
 Deno.serve(async (req) => {

@@ -14,6 +14,7 @@
      join(code)                    ->    match
      get(matchId)                  ->    match
      playMove(matchId, mv)
+     nudge(matchId)                      fire and forget, no-op vs a human
      rematch(matchId)
      sendChat(matchId, body)
      players(match)                ->    {blue, red} profiles
@@ -80,6 +81,21 @@ const SupaT = {
       throw new Error(error.message);
     }
     return data;
+  },
+
+  /* Ask the server to take the opponent's turn if the opponent is not a
+     person. Fired in *every* match, including human ones, where it does
+     nothing — a request that only went out in some games would itself be
+     the giveaway. Never awaited by the caller and never surfaces an
+     error: it must not be able to slow a move down or show a message. */
+  nudge(matchId){
+    this.init()
+      .then(sb => sb.auth.getSession().then(({data: {session}}) =>
+        sb.functions.invoke('bot-move', {
+          body: {matchId},
+          headers: session ? {Authorization: 'Bearer ' + session.access_token} : {},
+        })))
+      .catch(() => {});
   },
 
   async touch(matchId){ try{ await this._rpc('touch_match', {p_match: matchId}); }catch(e){} },
@@ -287,6 +303,8 @@ const MockT = {
   },
 
   async ratings(){ return {}; },
+
+  nudge(){},          // no server to nudge in the offline flow
 
   async touch(id){
     const m = this._read(id);

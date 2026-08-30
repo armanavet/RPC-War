@@ -17,7 +17,7 @@ const titleOf = slug => (GAMES.find(g => g.slug === slug) || {}).title || slug;
 const esc = t => String(t).replace(/[&<>"]/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-/* Neutral wording: this table mixes all four games, so it cannot use any
+/* Neutral wording: this table mixes every game, so it cannot use any
    one game's phrasing the way the in-game banner does. */
 const REASONS = {
   backrow: 'reached the back row',

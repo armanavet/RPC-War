@@ -31,7 +31,10 @@ import * as auth from './auth.js';
 import * as profile from '../site/profile.js';
 
 const HEARTBEAT_MS = 15000;
-const QUEUE_POLL_MS = 2500;
+/* The queue is polled, not pushed, so this interval is half of how long
+   a pairing can take. It has to stay well under the server's own
+   willingness to wait or the poll becomes the bottleneck. */
+const QUEUE_POLL_MS = 1200;
 const ABANDON_MS = 60000;
 
 const SEAT_A = 0, SEAT_B = 1;
@@ -116,6 +119,8 @@ export function createSync({slug, state, ui, reasons}){
     ui.setLink(linkFor(m.code));
 
     net.unwatch = T.watch(m.id, onMatch, onChat);
+    /* If the opponent moves first, nothing else would ever ask them to. */
+    T.nudge(m.id);
     startHeartbeat();
     ui.renderMpPanels();
     ui.render();
@@ -339,6 +344,7 @@ export function createSync({slug, state, ui, reasons}){
     async pushMove(mv){
       try{
         await T.playMove(net.matchId, mv);
+        T.nudge(net.matchId);        // their turn now, whoever they are
       }catch(e){
         // the server refused it — our board is now ahead of the truth
         fail(e);

@@ -7,7 +7,7 @@
    Game panel, and the move list is somewhere off the bottom of the
    world. This turns those panels into one segmented control.
 
-   Used by all four games. A game calls it once and forgets:
+   Used by every game. A game calls it once and forgets:
 
      import {mountRailTabs} from '../../site/railtabs.js';
      mountRailTabs();
