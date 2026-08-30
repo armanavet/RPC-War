@@ -14,37 +14,46 @@
      npm install sharp && node tools/make-cards.mjs
    ============================================================ */
 import sharp from 'sharp';
-import {mkdir} from 'node:fs/promises';
+import {mkdir, readFile, writeFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 
 const W = 640, H = 272;
 
 /* Straight out of the light palette in css/tokens.css. */
 const LITE = '#EBE2CE', DARK = '#CFC0A2', EDGE = '#BCAC8C';
 
-/* A position per game: [column, row, sprite] with 0,0 top left of the
-   crop. Chosen to look like a game a few moves in — symmetrical setups
-   read as a screenshot of the start screen, which is duller. */
+/* A card is 310px wide on a phone, less than half what it is authored
+   at — so the crop is chosen for how it reads *there*, not here. Nine
+   columns put each piece at about 30 display pixels: the emblems went
+   illegible and the board read as noise. `cell` is therefore set
+   directly rather than derived from a column count, at a size that
+   divides the height evenly so no row is sliced through the middle.
+
+   A position per game: [column, row, sprite], 0,0 at the top left of
+   the crop. Chosen to look like a game a few moves in — symmetrical
+   setups read as a screenshot of the start screen, which is duller. */
 const GAMES = {
   'rps-chess': {
-    cols: 9, rows: 4, dir: 'img/1', inset: 0.07,
+    cell: 136, dir: 'img/1', inset: 0.06,
     pieces: [
-      [1, 0, 'r1c1'], [4, 0, 'r1c2'], [7, 0, 'r1c1'],
-      [2, 1, 'r1c0'], [5, 1, 'r1c2'], [8, 1, 'r0c1'],
-      [0, 2, 'r0c0'], [3, 2, 'r0c1'], [6, 2, 'r1c0'],
-      [2, 3, 'r0c2'], [5, 3, 'r0c0'], [7, 3, 'r0c2'],
+      [0, 0, 'r1c1'], [2, 0, 'r1c2'], [3, 0, 'r1c0'],
+      [1, 1, 'r0c0'], [2, 1, 'r1c1'], [4, 1, 'r0c2'],
     ],
   },
   anvil: {
-    cols: 6, rows: 3, dir: 'img/anvil', inset: 0.12,
+    /* Crowded around the middle, because that is the whole game — and
+       so the two cards do not resolve to the same picture of scattered
+       discs at thumbnail size. */
+    cell: 136, dir: 'img/anvil', inset: 0.10,
     pieces: [
-      [0, 0, 'r'], [2, 0, 'r'], [4, 0, 'r'],
-      [2, 1, 'b'], [3, 1, 'r'],
-      [1, 2, 'b'], [3, 2, 'b'], [5, 2, 'b'],
+      [1, 0, 'r'], [2, 0, 'r'], [3, 0, 'b'],
+      [0, 1, 'b'], [2, 1, 'b'], [3, 1, 'r'], [4, 1, 'r'],
     ],
   },
 };
 
-function boardSvg(cols, rows, cell){
+function boardSvg(cols, rows, cell, scale = 1){
+  const W = 640 * scale, H = 272 * scale;
   const parts = [`<rect width="${W}" height="${H}" fill="${LITE}"/>`];
   for(let r = 0; r < rows; r++){
     for(let c = 0; c < cols; c++){
@@ -70,10 +79,18 @@ function boardSvg(cols, rows, cell){
     + `</defs>${parts.join('')}</svg>`;
 }
 
-async function card(slug){
+/* Rendered once per pixel density rather than resized afterwards.
+
+   sharp applies resize BEFORE composite whatever order you call them
+   in — so scaling the finished card up to 2x actually scaled the empty
+   board and then pasted the pieces at their original coordinates,
+   crowding every one of them into the top-left quarter. The 1x file
+   was correct, so it only showed on devices that pick @2x: phones. */
+async function card(slug, scale){
   const g = GAMES[slug];
-  const cell = W / g.cols;
-  const rows = Math.ceil(H / cell);
+  const cell = g.cell * scale;
+  const cols = Math.ceil((W * scale) / cell);
+  const rows = Math.ceil((H * scale) / cell);
   const size = Math.round(cell * (1 - g.inset * 2));
   const pad = Math.round(cell * g.inset);
 
@@ -87,12 +104,27 @@ async function card(slug){
 
   for(const [c, r, file] of (g.pieces || [])) await place(c, r, file);
   await mkdir('img/cards', {recursive: true});
-  const base = sharp(Buffer.from(boardSvg(g.cols, rows, cell))).composite(layers);
-  await base.clone().webp({quality: 86, effort: 6}).toFile(`img/cards/${slug}.webp`);
-  await base.clone().resize(W * 2, H * 2, {kernel: 'lanczos3'})
-    .webp({quality: 82, effort: 6}).toFile(`img/cards/${slug}@2x.webp`);
-  console.log(`  ${slug}: ${g.cols} cols, ${g.pieces.length} placements`);
+  await sharp(Buffer.from(boardSvg(cols, rows, cell, scale)))
+    .composite(layers)
+    .webp({quality: scale > 1 ? 82 : 86, effort: 6})
+    .toFile(`img/cards/${slug}${scale > 1 ? '@2x' : ''}.webp`);
+  console.log(`  ${slug}: ${cols}x${rows} cells of ${cell}px, ${g.pieces.length} pieces`);
 }
 
-for(const slug of Object.keys(GAMES)) await card(slug);
-console.log('cards drawn from the real board and the real pieces');
+for(const slug of Object.keys(GAMES)){ await card(slug, 1); await card(slug, 2); }
+
+/* Regenerated art keeps its filename, so browsers and CDNs happily
+   serve the copy they already have — which is how a card that had been
+   fixed twice still looked wrong on a phone. A content hash written
+   into a tiny generated module gives the URLs something to change. */
+const h = createHash('sha1');
+for(const slug of Object.keys(GAMES)){
+  h.update(await readFile(`img/cards/${slug}.webp`));
+  h.update(await readFile(`img/cards/${slug}@2x.webp`));
+}
+const version = h.digest('hex').slice(0, 8);
+const banner = '/* GENERATED by tools/make-cards.mjs - do not edit. */';
+await writeFile('js/site/art-version.js',
+  banner + '\n' + "export const ART_V = '" + version + "';" + '\n', 'utf8');
+
+console.log(`cards drawn from the real board and the real pieces (v${version})`);

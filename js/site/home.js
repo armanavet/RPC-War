@@ -6,6 +6,7 @@ import * as profile from './profile.js';
 import {mountAuthBar} from './authbar.js';
 import {onAuth} from '../net/auth.js';
 import {startPresence} from '../net/presence.js';
+import {ART_V} from './art-version.js';
 import {mountAds} from './ads.js';
 
 const $ = id => document.getElementById(id);
@@ -49,8 +50,8 @@ function renderProfile(){
 function card(g){
   return `<a class="gcard" href="${g.href}">
     <div class="gcard__art">
-      <img class="gcard__img" src="img/cards/${g.slug}.webp"
-           srcset="img/cards/${g.slug}.webp 1x, img/cards/${g.slug}@2x.webp 2x"
+      <img class="gcard__img" src="img/cards/${g.slug}.webp?v=${ART_V}"
+           srcset="img/cards/${g.slug}.webp?v=${ART_V} 1x, img/cards/${g.slug}@2x.webp?v=${ART_V} 2x"
            width="640" height="272" loading="lazy" decoding="async" alt="">
     </div>
     <div class="gcard__bd">
