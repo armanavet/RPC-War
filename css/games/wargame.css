@@ -1,12 +1,15 @@
 /* ============================================================
-   Salient. Class names that land on JS-generated nodes
-   (.cell, .mark, .unit, .ctr, .terr) are a contract with
-   js/games/_shared/board.js.
+   Shared wargame layout — Salient, Tideline, Breakthrough and
+   Barbican all load this, then exactly one skin stylesheet on top.
 
-   The board is the only thing on this page doing any real work, so
-   almost everything below is about one question: can you see where
-   the front is without being told? Terrain is drawn faint, counters
-   are drawn hard, and the control shading sits between them.
+   This file owns STRUCTURE only: the board grid, the counter
+   positioning, the player bars, the rail and the status line. It
+   owns no colours, no textures and no piece art, because the four
+   games are meant to look nothing like each other and anything
+   opinionated here would have to be fought by three of them.
+
+   Class names that land on JS-generated nodes (.cell, .mark, .unit)
+   are a contract with js/games/_shared/board.js.
    ============================================================ */
 
 .game{padding:22px 0 0}
