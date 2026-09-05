@@ -1,0 +1,264 @@
+/* ============================================================
+   The computer player for Salient.
+
+   Negamax with alpha-beta, iterative deepening, a time budget, and —
+   the part that actually makes it work — hard forward pruning.
+
+   WHY FORWARD PRUNING
+
+   A turn in Salient offers around three hundred legal moves. Most are
+   noise: shuffling a depot one square sideways in the rear, walking an
+   infantryman along a road behind a quiet sector. Searching them all
+   bought two plies of depth, which in a game about encirclement is
+   worse than useless — two plies cannot see a pocket close.
+
+   So each node ranks its moves statically and searches only the best
+   handful, narrowing with depth. It is theoretically unsound and it
+   is the difference between a computer that can see an envelopment
+   coming and one that cannot. The ranking below is therefore load
+   bearing: anything it fails to surface is a move the AI will never
+   consider at all.
+
+   WHY THE EVALUATION IS ALL GROUND
+
+   Almost the whole score is territory and objectives, which is
+   unusual for a board game AI and is correct here: you win Salient by
+   controlling squares, and units are the means. An early version
+   scored material at chess-like weights and played like a miser — it
+   declined every attack, because attacking risks a unit, and lost on
+   points while holding a full army.
+   ============================================================ */
+import {BLUE, RED, SZ, geo, OBJECTIVES, OBJ_VALUE, VP_WIN, TYPES,
+        GEN, STF, INF, ARM, ART, ENG, REC, DEP,
+        genMoves, apply, controlOf, supplyOf, generalOf, income,
+        territory, countUnits, verdict,
+        isPass, isEntrench, isBridge, isPlace, placeAt,
+        moveFrom, moveTo, PASS} from './rules.js';
+import {owner} from '../_shared/control.js';
+
+const WIN = 1e6;
+const ABORT = {};
+let _nodes = 0;
+let _deadline = Infinity;
+
+/* What a unit is worth if you simply lose it. The general's number is
+   large but not infinite: verdict() already ends the game, and an
+   infinity here poisons the arithmetic in every position where he is
+   merely in some danger. Staff are priced well above their fighting
+   value because losing one silences a wing. */
+const VALUE = [];
+VALUE[GEN] = 900; VALUE[STF] = 320; VALUE[INF] = 110; VALUE[ARM] = 170;
+VALUE[ART] = 150; VALUE[ENG] = 90;  VALUE[REC] = 80;  VALUE[DEP] = 100;
+
+const OBJ_W  = 200;   // one point per turn, compounding
+const VP_W   = 7;     // and the points already banked
+const TERR_W = 4;
+const CUT_W  = 75;
+const NEAR_W = 3;
+
+/* Distance from every square to every objective, once. Computing this
+   with Math.abs inside the evaluation was, embarrassingly, a fifth of
+   the whole search. */
+const OBJ_DIST = OBJECTIVES.map(o => {
+  const d = new Int16Array(SZ);
+  for(let i = 0; i < SZ; i++) d[i] = geo.dist(o, i);
+  return d;
+});
+
+/* Positive is good for blue. */
+export function evalBlue(s){
+  const f = controlOf(s);
+  let score = 0;
+
+  /* the ground. What matters is not how many objectives you hold but
+     what they pay each turn, so the crossroads counts triple here
+     exactly as it does on the scoreboard. */
+  let bo = 0, ro = 0;
+  const objOwner = new Int8Array(OBJECTIVES.length);
+  for(let m = 0; m < OBJECTIVES.length; m++){
+    const w = owner(f[OBJECTIVES[m]]);
+    objOwner[m] = w;
+    if(w === BLUE) bo += OBJ_VALUE[m]; else if(w === RED) ro += OBJ_VALUE[m];
+  }
+  score += (bo - ro) * OBJ_W;
+  score += (s.vp[BLUE] - s.vp[RED]) * VP_W;
+
+  let bt = 0, rt = 0;
+  for(let i = 0; i < SZ; i++){ const v = f[i]; if(v > 0) bt++; else if(v < 0) rt++; }
+  score += (bt - rt) * TERR_W;
+
+  /* the army */
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k]) continue;
+    const sign = s.side[k] === BLUE ? 1 : -1;
+    score += sign * VALUE[s.type[k]];
+    if(s.cut[k] > 0) score -= sign * CUT_W * s.cut[k];
+  }
+
+  /* Command health. A general or staff officer out of supply is worth
+     far less than his own counter suggests, because everything within
+     his radius stops being able to move. */
+  const supB = supplyOf(s, BLUE, f);
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== BLUE || !TYPES[s.type[k]].cmd) continue;
+    if(!supB[s.sq[k]]) score -= 200;
+  }
+
+  /* Pull toward objectives nobody holds, so the opening has a
+     direction before there is anything concrete to score. Only
+     contested ones count: dragging units toward an objective already
+     held is how an AI talks itself into abandoning a flank. */
+  for(let m = 0; m < OBJECTIVES.length; m++){
+    if(objOwner[m] !== -1) continue;
+    const d = OBJ_DIST[m];
+    let nb = 0, nr = 0;
+    for(let k = 0; k < s.n; k++){
+      if(!s.live[k] || s.type[k] === DEP) continue;
+      const dd = d[s.sq[k]];
+      if(dd > 7) continue;
+      const w = 8 - dd;
+      if(s.side[k] === BLUE) nb += w; else nr += w;
+    }
+    score += (nb - nr) * NEAR_W * OBJ_VALUE[m];
+  }
+
+  return score;
+}
+
+/* ---------- move ranking ----------
+   Cheap and static. Everything the search will ever look at comes
+   through here, so it ranks on the four things that actually decide
+   games: getting to contested objectives, pushing into ground the
+   enemy holds, rescuing units that are cut off, and not shuffling. */
+function rank(s, moves, side){
+  const f = controlOf(s);
+  const want = [];
+  for(let m = 0; m < OBJECTIVES.length; m++)
+    if(owner(f[OBJECTIVES[m]]) !== side) want.push([OBJ_DIST[m], OBJ_VALUE[m]]);
+
+  const sc = new Float64Array(moves.length);
+  for(let k = 0; k < moves.length; k++){
+    const mv = moves[k];
+    if(isPass(mv)){ sc[k] = -1e9; continue; }
+
+    /* A replacement is worth most when the line needs one: score it
+       by how contested the ground in front of that baseline square
+       is, so reserves are fed into the sector under pressure rather
+       than parked on a quiet flank. */
+    if(isPlace(mv)){
+      const i = placeAt(mv);
+      let near = 0;
+      for(const j of geo.N8[i]) if((side === BLUE ? f[j] : -f[j]) <= 0) near++;
+      sc[k] = 70 + near * 22;
+      continue;
+    }
+
+    const from = moveFrom(mv), to = moveTo(mv);
+    let v = 0;
+
+    if(isBridge(mv))        v = 120;
+    else if(isEntrench(mv)) v = 60;
+    else{
+      /* toward whichever contested objective is worth most per step */
+      let pull = 0;
+      for(const [d, val] of want){
+        const gain = d[from] - d[to];             // closing the distance
+        pull = Math.max(pull, gain * 26 * val - d[to] * 3);
+      }
+      v = pull;
+
+      /* pushing onto ground the enemy holds is the whole game */
+      const t = side === BLUE ? f[to] : -f[to];
+      if(t < 0) v += 55; else if(t === 0) v += 25;
+
+      const u = unitIndexAt(s, from);
+      if(u >= 0){
+        if(s.cut[u] > 0) v += 90;                 // get it out of the pocket
+        const ty = s.type[u];
+        if(ty === DEP) v -= 40;                   // depots move for a reason or not at all
+        if(ty === GEN) v -= 25;                   // and so does the general
+        if(ty === REC || ty === ARM) v += 10;
+      }
+      if(from === to) v -= 500;
+    }
+    sc[k] = v;
+  }
+  const idx = new Array(moves.length);
+  for(let k = 0; k < moves.length; k++) idx[k] = k;
+  idx.sort((a, b) => sc[b] - sc[a]);
+  const out = new Array(moves.length);
+  for(let k = 0; k < moves.length; k++) out[k] = moves[idx[k]];
+  return out;
+}
+
+function unitIndexAt(s, i){
+  for(let k = 0; k < s.n; k++) if(s.live[k] && s.sq[k] === i) return k;
+  return -1;
+}
+
+/* How many of the ranked moves to actually search, by remaining
+   depth. Wide at the top where a mistake is expensive, narrow in the
+   tail where it is only a refinement. */
+const WIDTH = [1, 6, 10, 14, 18, 22];
+const widthAt = d => WIDTH[Math.min(d, WIDTH.length - 1)];
+
+function negamax(s, depth, alpha, beta){
+  if((++_nodes & 127) === 0 && Date.now() > _deadline) throw ABORT;
+
+  const side = s.turn;
+  const v = verdict(s, side);
+  if(v) return v.w === -1 ? 0 : (v.w === side ? WIN + depth : -(WIN + depth));
+  if(depth <= 0) return (side === BLUE ? 1 : -1) * evalBlue(s);
+
+  const all = rank(s, genMoves(s, side), side);
+  const width = Math.min(all.length, widthAt(depth));
+  let best = -Infinity;
+  for(let i = 0; i < width; i++){
+    const r = apply(s, all[i]);
+    const sc = -negamax(r.st, depth - 1, -beta, -alpha);
+    if(sc > best) best = sc;
+    if(best > alpha) alpha = best;
+    if(alpha >= beta) break;
+  }
+  return best === -Infinity ? 0 : best;
+}
+
+export function bestMove(s, depth, sloppy){
+  const side = s.turn;
+  const all = genMoves(s, side);
+  if(!all.length) return PASS;
+  if(all.length === 1) return all[0];
+  const moves = rank(s, all, side);
+  if(sloppy && Math.random() < 0.18)
+    return moves[(Math.random() * Math.min(8, moves.length)) | 0];
+
+  /* The root is searched wider than anywhere else: this is the one
+     choice that is actually played. */
+  const width = Math.min(moves.length, 28);
+  let best = -Infinity, cand = [], alpha = -Infinity;
+  for(let i = 0; i < width; i++){
+    const r = apply(s, moves[i]);
+    const sc = -negamax(r.st, depth - 1, -Infinity, -alpha);
+    if(sc > best + 1e-9){ best = sc; cand = [moves[i]]; alpha = Math.max(alpha, sc); }
+    else if(sc > best - 1e-9) cand.push(moves[i]);
+  }
+  return cand[(Math.random() * cand.length) | 0];
+}
+
+export function bestMoveTimed(s, maxDepth, budgetMs, sloppy){
+  let best = null;
+  _nodes = 0; _deadline = Date.now() + budgetMs;
+  try{
+    for(let d = 2; d <= maxDepth; d++){
+      const m = bestMove(s, d, sloppy);
+      if(m != null) best = m;
+      if(Date.now() > _deadline) break;
+    }
+  }catch(e){
+    if(e !== ABORT){ _deadline = Infinity; throw e; }
+  }
+  _deadline = Infinity;
+  return best != null ? best : bestMove(s, 2, sloppy);
+}
+
+export const nodes = () => _nodes;

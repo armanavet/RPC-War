@@ -1,0 +1,537 @@
+/* ============================================================
+   Breakthrough — the rules, and nothing else.
+
+   Pure functions: no DOM, no network. The edge functions import this
+   file to verify finished games and play the bots.
+
+   THE IDEA
+
+   Control does not move the line. Pressure does.
+
+   Every turn, each square of the enemy's line that you are leaning
+   on hard enough gains a point of pressure. Pressure is patient and
+   it is visible — your opponent can watch it build and knows
+   perfectly well where you are massing. When three or more connected
+   squares of their line reach breaking point at the same moment, the
+   sector CRACKS: the units holding it are routed backwards, a hole
+   opens, and you are handed a run of extra moves to drive fast units
+   through it before it closes.
+
+   So the game is not a shoving match. It is: feint wide, mass
+   quietly, crack one sector, and pour through — against a defender
+   whose whole job is reading which build-up is real and keeping a
+   mobile reserve back to seal the hole when it opens.
+
+   WHY PRESSURE IS NOT THE CONTROL FIELD
+
+   Pressure builds where you project force onto ground the enemy
+   still holds. That is invisible in the control field, which is a
+   difference: a square where you both project nine looks exactly
+   like a square where neither of you is present. Hence fieldSplit
+   in _shared/control.js — the one thing this game needed that the
+   other two did not.
+
+   WINNING
+
+   Take both of the supply depots in their half and hold them through
+   a reply. That needs a hole in their line and something solid
+   driven through it, which is what the whole apparatus above is for.
+
+   It used to be "get a unit onto their back row". That made a
+   footrace: both armies ran past each other down opposite flanks and
+   the game was decided by tempo before either line was touched.
+   Every test ended with both sides reaching the far row. A goal you
+   have to *hold* cannot be raced for.
+
+   ENCODING
+
+   Squares 0..194 on a board 15 wide and 13 high, index 0 top-left.
+   A move packs as from * 195 + to. PASS when nothing else is legal.
+   ============================================================ */
+import {makeGeo, field, fieldSplit, reachable, zoneOfControl, TERRAIN,
+        OPEN, WOODS, HILL, TOWN, RIVER, FORD, ROAD, MARSH, owner} from '../_shared/control.js';
+
+export const W = 15, H = 13;
+export const geo = makeGeo(W, H);
+export const SZ = geo.SZ;
+export const BLUE = 0, RED = 1;
+export const {rowOf, colOf, at, sq, dist} = geo;
+
+/* ---------- units ---------- */
+export const GEN = 0, INF = 1, ARM = 2, ART = 3, REC = 4, MIL = 5;
+
+export const TYPES = [
+  {key:'gen', name:'General',   str:5, hole:0, mp:6,  hold:3, fast:0},
+  {key:'inf', name:'Infantry',  str:3, hole:0, mp:4,  hold:3, fast:0},
+  {key:'arm', name:'Armour',    str:4, hole:0, mp:8,  hold:1, fast:1},
+  {key:'art', name:'Artillery', str:6, hole:2, mp:4,  hold:0, fast:0},
+  {key:'rec', name:'Recon',     str:2, hole:0, mp:10, hold:0, fast:1},
+  {key:'mil', name:'Militia',   str:2, hole:0, mp:3,  hold:4, fast:0},
+];
+
+/* ---------- the map ----------
+   Deep rather than wide, because the whole point is having somewhere
+   to exploit into. Two belts of rough ground across the middle give
+   the defender something to hold and the attacker a reason to pick
+   one sector rather than attacking everywhere. */
+export const OBJECTIVES = [at(6,7), at(3,3), at(3,11), at(9,3), at(9,11)];
+/* The two depots in each half. Taking *both* of theirs, and holding
+   them through a reply, is how the game is won. */
+export const REAR = [[at(3,3), at(3,11)],     // blue must take these (red's)
+                     [at(9,3), at(9,11)]];    // red must take these (blue's)
+
+function buildTerrain(){
+  const t = new Uint8Array(SZ).fill(OPEN);
+  const put = (k, l) => { for(const i of l) t[i] = k; };
+  /* Lateral roads in each rear, and short connectors that stop well
+     short of the middle. There used to be a road running the full
+     height of the board through the centre file, and it was a
+     motorway to the enemy baseline: armour covered ten squares of it
+     in a turn and games were decided in eleven plies before either
+     line had been touched. Roads move reserves along a front. They
+     must never cross one. */
+  for(let c = 0; c < W; c++){ t[at(1,c)] = ROAD; t[at(11,c)] = ROAD; }
+  for(const c of [3, 11]){
+    for(let r = 1; r <= 4;  r++) t[at(r,c)] = ROAD;
+    for(let r = 8; r <= 11; r++) t[at(r,c)] = ROAD;
+  }
+  for(let c = 2; c <= 5; c++){ t[at(5,c)] = RIVER; t[at(7,W-1-c)] = RIVER; }
+  put(FORD, [at(5,4), at(7,10)]);
+  put(HILL, [at(4,7),at(8,7), at(6,2),at(6,12)]);
+  put(WOODS,[at(4,1),at(8,13), at(4,13),at(8,1),
+             at(6,5),at(6,9), at(2,7),at(10,7)]);
+  put(MARSH,[at(5,10),at(7,4), at(3,6),at(9,8)]);
+  put(TOWN, OBJECTIVES);
+  return t;
+}
+export const TERRAIN_MAP = buildTerrain();
+
+/* ---------- dials ---------- */
+/* Force on their ground that counts as leaning on it. This is a raw
+   projection total, not a margin, so it is reached by two or three
+   units working the same stretch of line — which is exactly the
+   massing the game wants to reward. At five it was never reached at
+   all: a lone infantryman projects three. */
+export const PRESS_MIN = 3;
+export const PRESS_CAP = 4;    // breaking point
+export const CRACK_LEN = 3;    // connected squares needed to open a sector
+export const EXPLOIT   = 3;    // extra activations a crack buys
+export const ROUT_BACK = 3;    // rows a routed unit is thrown
+export const HOLD_PLIES = 3;   // how long a lodgement must survive
+/* How hard you must hold the square you have broken through onto.
+
+   Bare control was not enough. A side's own baseline is a control
+   vacuum in the late opening — its artillery projects nothing within
+   two squares of itself, and everything else has gone forward — so a
+   single recon with a strength of two could walk in and out-project
+   an empty rear. Five takes a real force: a tank with something
+   standing behind it. */
+export const LODGE_MIN = 4;
+/* Lowered from eight. Overextension has to be punished or the game
+   degenerates into a footrace: with units effectively unkillable,
+   both sides simply sprinted past each other into the empty rear and
+   the winner was whoever moved first. */
+export const BREAK     = 6;
+export const MIN_UNITS = 3;
+export const PLY_CAP   = 340;
+
+export const PASS = SZ * SZ;
+export const packMove = (from, to) => from * SZ + to;
+export const moveFrom = mv => (mv / SZ) | 0;
+export const moveTo   = mv => mv % SZ;
+export const isPass   = mv => mv === PASS;
+
+const BLUE_SETUP = [
+  [GEN, at(12,7)],
+  [ART, at(12,3)], [ART, at(12,11)],
+  [ARM, at(11,1)], [ARM, at(11,13)], [ARM, at(12,7-2)],
+  [REC, at(11,5)], [REC, at(11,9)],
+  [INF, at(10,2)], [INF, at(10,5)], [INF, at(10,9)], [INF, at(10,12)],
+  [MIL, at(11,3)], [MIL, at(11,11)],
+  [INF, at(9,7)],
+];
+
+export function startState(){
+  const n = BLUE_SETUP.length * 2;
+  const s = {
+    n,
+    sq: new Int16Array(n), side: new Uint8Array(n), type: new Uint8Array(n),
+    live: new Uint8Array(n),
+    /* One array per side. They were a single signed array to begin
+       with, which quietly let each side's step overwrite the other's
+       build-up on any square both were leaning on — that is, on
+       precisely the squares that matter. */
+    pB: new Int8Array(SZ),
+    pR: new Int8Array(SZ),
+    ter: TERRAIN_MAP.slice(),
+    turn: BLUE, ply: 0,
+    exploit: 0,                      // activations left in a breakthrough
+    expSide: -1,                     // ...and whose they are
+    lodged: [-1, -1],                // ply a side first reached the far row
+  };
+  let k = 0;
+  for(const [t, i] of BLUE_SETUP){
+    s.sq[k] = i; s.side[k] = BLUE; s.type[k] = t; s.live[k] = 1; k++;
+    s.sq[k] = (SZ - 1) - i; s.side[k] = RED; s.type[k] = t; s.live[k] = 1; k++;
+  }
+  return s;
+}
+
+export function clone(s){
+  return {
+    n: s.n,
+    sq: s.sq.slice(), side: s.side.slice(), type: s.type.slice(),
+    live: s.live.slice(), pB: s.pB.slice(), pR: s.pR.slice(), ter: s.ter.slice(),
+    turn: s.turn, ply: s.ply, exploit: s.exploit, expSide: s.expSide,
+    lodged: [s.lodged[0], s.lodged[1]],
+  };
+}
+
+/* ---------- fields ---------- */
+const _view = {n: 0};
+export function viewOf(s){
+  if(_view.n !== s.n){
+    _view.n = s.n;
+    _view.sq = new Int16Array(s.n); _view.side = new Uint8Array(s.n);
+    _view.str = new Int16Array(s.n); _view.hole = new Uint8Array(s.n);
+    _view.live = new Uint8Array(s.n); _view.hold = new Int16Array(s.n);
+  }
+  for(let k = 0; k < s.n; k++){
+    const t = TYPES[s.type[k]];
+    _view.sq[k] = s.sq[k]; _view.side[k] = s.side[k]; _view.live[k] = s.live[k];
+    _view.hole[k] = t.hole; _view.str[k] = t.str; _view.hold[k] = t.hold;
+  }
+  return _view;
+}
+
+const _field = new Int16Array(SZ);
+const _fb = new Int16Array(SZ), _fr = new Int16Array(SZ);
+let _fieldFor = null, _splitFor = null;
+
+export function controlOf(s){
+  if(_fieldFor === s) return _field;
+  field(geo, viewOf(s), s.ter, _field, null);
+  _fieldFor = s;
+  return _field;
+}
+export function splitOf(s){
+  if(_splitFor !== s){ fieldSplit(geo, viewOf(s), s.ter, _fb, _fr, null); _splitFor = s; }
+  return {b: _fb, r: _fr};
+}
+export function soil(s){
+  if(_fieldFor === s) _fieldFor = null;
+  if(_splitFor === s) _splitFor = null;
+}
+
+/* ---------- pressure ----------
+   Builds where you are leaning on ground they hold; decays
+   everywhere else, so a build-up has to be maintained and cannot be
+   banked over a whole game. */
+export const pressOf = (s, side) => side === BLUE ? s.pB : s.pR;
+
+export function pressureStep(s, side){
+  const f = controlOf(s);
+  const sp = splitOf(s);
+  const mine = side === BLUE ? sp.b : sp.r;
+  const p = pressOf(s, side);
+  for(let i = 0; i < SZ; i++){
+    const theirs = side === BLUE ? f[i] < 0 : f[i] > 0;
+    if(theirs && mine[i] >= PRESS_MIN){
+      if(p[i] < PRESS_CAP) p[i]++;
+    }else if(p[i] > 0){
+      p[i]--;
+    }
+  }
+}
+
+/* Connected runs of squares at breaking point. Returns an array of
+   arrays of squares. */
+export function cracks(s, side){
+  const p = pressOf(s, side);
+  const hot = new Uint8Array(SZ);
+  for(let i = 0; i < SZ; i++) if(p[i] >= PRESS_CAP) hot[i] = 1;
+  const seen = new Uint8Array(SZ), out = [];
+  for(let i = 0; i < SZ; i++){
+    if(!hot[i] || seen[i]) continue;
+    const comp = [i]; seen[i] = 1;
+    for(let h = 0; h < comp.length; h++)
+      for(const j of geo.N4[comp[h]])
+        if(hot[j] && !seen[j]){ seen[j] = 1; comp.push(j); }
+    if(comp.length >= CRACK_LEN) out.push(comp);
+  }
+  return out;
+}
+
+/* Throw a unit back toward its own baseline. Deterministic: the
+   first empty square found walking rows away from the front, nearest
+   file first, lowest index breaking ties. */
+function rout(s, k, blocked){
+  const side = s.side[k], i = s.sq[k];
+  const dir = side === BLUE ? 1 : -1;             // blue's home is the bottom
+  const r0 = rowOf(i), c0 = colOf(i);
+  for(let step = ROUT_BACK; step >= 1; step--){
+    const r = r0 + dir * step;
+    if(r < 0 || r >= H) continue;
+    for(let dc = 0; dc <= 3; dc++){
+      for(const c of (dc === 0 ? [c0] : [c0 - dc, c0 + dc])){
+        if(c < 0 || c >= W) continue;
+        const j = at(r, c);
+        if(blocked[j] || TERRAIN[s.ter[j]].move <= 0) continue;
+        blocked[i] = 0; blocked[j] = 1; s.sq[k] = j;
+        return j;
+      }
+    }
+  }
+  /* Nothing on the obvious lines back — widen it to the nearest empty
+     square in any direction. Without this fallback a unit routed in a
+     crowded rear simply died, and since generals were being caught by
+     it, eight games in ten ended with a headquarters destroyed by a
+     crack rather than by anything either player had planned. */
+  const seen = new Uint8Array(SZ), q = [i];
+  seen[i] = 1;
+  for(let h = 0; h < q.length; h++){
+    const cur = q[h];
+    if(cur !== i && !blocked[cur] && TERRAIN[s.ter[cur]].move > 0){
+      blocked[i] = 0; blocked[cur] = 1; s.sq[k] = cur;
+      return cur;
+    }
+    for(const j of geo.N4[cur]) if(!seen[j]){ seen[j] = 1; q.push(j); }
+  }
+  return -1;
+}
+
+export function applyCracks(s, side){
+  const list = cracks(s, side);
+  if(!list.length) return null;
+  const blocked = new Uint8Array(SZ);
+  for(let k = 0; k < s.n; k++) if(s.live[k]) blocked[s.sq[k]] = 1;
+
+  const routed = [], lost = [];
+  const hit = new Set();
+  for(const comp of list) for(const i of comp) hit.add(i);
+
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] === side) continue;
+    if(!hit.has(s.sq[k])) continue;
+    const from = s.sq[k];
+    const to = rout(s, k, blocked);
+    if(to >= 0){ routed.push({k, from, to}); continue; }
+    /* A headquarters is never destroyed by a rout it happened to be
+       standing in. It holds its ground and takes its chances. */
+    if(s.type[k] === GEN) continue;
+    s.live[k] = 0; blocked[from] = 0;
+    lost.push({k, sq: from, why: 'destroyed in the rout'});
+  }
+  /* The pressure is spent opening the hole. */
+  const p = pressOf(s, side);
+  for(const i of hit) p[i] = 0;
+  s.exploit = EXPLOIT;
+  s.expSide = side;
+  soil(s);
+  return {squares: [...hit], routed, lost};
+}
+
+/* ---------- moves ---------- */
+const _blocked = new Uint8Array(SZ);
+const _zoc = new Uint8Array(SZ);
+const _reach = new Int16Array(SZ);
+
+export function genMoves(s, side){
+  const out = [];
+  _blocked.fill(0);
+  for(let k = 0; k < s.n; k++) if(s.live[k]) _blocked[s.sq[k]] = 1;
+  zoneOfControl(geo, viewOf(s), side, _zoc);
+
+  /* Turns alternate strictly, always — including through a
+     breakthrough, where the defender's only legal move is to watch.
+
+     The obvious implementation let the exploiting side simply move
+     again without passing the turn. That quietly broke the server:
+     play_move in 0002_matches.sql identifies the mover by the parity
+     of the move list ("blue plays the even indices"), so two moves in
+     a row from one player would have been rejected as the wrong
+     player's turn. Making the defender pass keeps the invariant the
+     whole backend rests on, costs one integer per exploited move, and
+     is honest about what is happening to them.
+
+     During a breakthrough only the fast arms may move: infantry
+     cannot exploit a hole they have just made, which is the entire
+     reason armour exists. */
+  if(s.exploit > 0 && s.expSide !== side) return [PASS];
+  const only = s.exploit > 0 && s.expSide === side;
+
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== side) continue;
+    const t = TYPES[s.type[k]];
+    if(only && !t.fast) continue;
+    const from = s.sq[k];
+    _blocked[from] = 0;
+    /* Zones of control bind everybody, always — except inside a
+       breakthrough, where they bind nobody.
+
+       Armour and recon used to ignore them permanently, as they do
+       in Salient. Here that was fatal: with nothing to stop it, a
+       recon simply drove twelve squares to the enemy back row on the
+       opening turn and won. Games lasted nine plies. An intact line
+       must stop fast troops cold, or the crack that opens one is
+       worth nothing. */
+    const best = reachable(geo, from, t.mp, s.ter, _blocked,
+                           only ? null : _zoc, _reach);
+    _blocked[from] = 1;
+    for(let j = 0; j < SZ; j++) if(best[j] >= 0) out.push(packMove(from, j));
+  }
+  if(!out.length) out.push(PASS);
+  return out;
+}
+
+export function unitAt(s, i){
+  for(let k = 0; k < s.n; k++) if(s.live[k] && s.sq[k] === i) return k;
+  return -1;
+}
+
+export function countUnits(s, side){
+  let n = 0;
+  for(let k = 0; k < s.n; k++) if(s.live[k] && s.side[k] === side) n++;
+  return n;
+}
+export function generalOf(s, side){
+  for(let k = 0; k < s.n; k++)
+    if(s.live[k] && s.side[k] === side && s.type[k] === GEN) return k;
+  return -1;
+}
+export const farRow = side => side === BLUE ? 0 : H - 1;
+
+/* A lodgement is one of their rear depots, held with real force.
+   Merely touching it is not a breakthrough.
+
+   The first version asked only whether a unit stood there, and games
+   lasted eight plies: a recon threaded a gap in the opening line,
+   ran twelve squares and won before either army had made contact.
+   Requiring control means the unit has to have friends with it,
+   which is the difference between a raid and a breakthrough. */
+export function holdsRear(s, side, f){
+  const ff = f || controlOf(s);
+  for(const i of REAR[side]){
+    const v = side === BLUE ? ff[i] : -ff[i];
+    if(v < LODGE_MIN) return false;
+  }
+  return true;
+}
+export const onFarRow = holdsRear;
+
+/* How many of their rear depots you have, for the interface and for
+   the evaluation. */
+export function rearHeld(s, side, f){
+  const ff = f || controlOf(s);
+  let n = 0;
+  for(const i of REAR[side]){
+    const v = side === BLUE ? ff[i] : -ff[i];
+    if(v >= LODGE_MIN) n++;
+  }
+  return n;
+}
+
+/* A general who is out-gunned displaces rather than dies. Killing
+   one outright ended seven of eight test games — with cracks routing
+   units around the map every few turns, a headquarters could be
+   caught in the open and the game was simply over, which made the
+   whole pressure system beside the point. Now the HQ falls back like
+   anything else, and is only lost when there is nowhere left to go.
+   That is also what a headquarters actually does. */
+export function resolve(s, side){
+  const f = controlOf(s);
+  const lost = [], moved = [];
+  const blocked = new Uint8Array(SZ);
+  for(let k = 0; k < s.n; k++) if(s.live[k]) blocked[s.sq[k]] = 1;
+
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== side) continue;
+    const v = side === BLUE ? f[s.sq[k]] : -f[s.sq[k]];
+    if(v > -BREAK) continue;
+    const from = s.sq[k];
+    if(s.type[k] === GEN){
+      const to = rout(s, k, blocked);
+      if(to >= 0){ moved.push({k, from, to, why: 'headquarters displaced'}); continue; }
+    }
+    s.live[k] = 0; blocked[from] = 0;
+    lost.push({k, sq: from, why: 'overwhelmed'});
+  }
+  if(lost.length || moved.length) soil(s);
+  return lost.concat(moved);
+}
+
+export function verdict(s, side){
+  if(generalOf(s, side) < 0)     return {w: 1 - side, why: 'the general is lost'};
+  if(generalOf(s, 1 - side) < 0) return {w: side,     why: 'the general is lost'};
+  if(countUnits(s, side) <= MIN_UNITS)     return {w: 1 - side, why: 'the army is spent'};
+  if(countUnits(s, 1 - side) <= MIN_UNITS) return {w: side,     why: 'the army is spent'};
+  /* A lodgement on the far row has to survive one reply. */
+  for(const c of [BLUE, RED])
+    if(s.lodged[c] >= 0 && s.ply > s.lodged[c] + HOLD_PLIES && onFarRow(s, c))
+      return {w: c, why: 'broke through the line'};
+  if(s.ply >= PLY_CAP){
+    const hb = rearHeld(s, BLUE), hr = rearHeld(s, RED);
+    if(hb !== hr) return {w: hb > hr ? BLUE : RED, why: 'came closest'};
+    const db = deepest(s, BLUE), dr = deepest(s, RED);
+    if(db !== dr) return {w: db > dr ? BLUE : RED, why: 'came closest'};
+    return {w: -1, why: 'the line held'};
+  }
+  return null;
+}
+
+/* How far into their half a side has got, in rows. */
+export function deepest(s, side){
+  let best = 0;
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== side) continue;
+    const r = rowOf(s.sq[k]);
+    const d = side === BLUE ? (H - 1 - r) : r;
+    if(d > best) best = d;
+  }
+  return best;
+}
+
+/* ---------- apply ---------- */
+export function apply(s, mv){
+  const ns = clone(s);
+  const side = s.turn;
+  let from = -1, to = -1, kind = 'pass', k = -1;
+
+  if(!isPass(mv)){
+    from = moveFrom(mv); to = moveTo(mv);
+    k = unitAt(ns, from);
+    if(k < 0) return {st: ns, kind: 'void', from, to, lost: [], side};
+    ns.sq[k] = to; kind = 'move';
+    soil(ns);
+  }
+
+  if(ns.lodged[side] < 0 && onFarRow(ns, side)) ns.lodged[side] = ns.ply;
+  else if(!onFarRow(ns, side)) ns.lodged[side] = -1;
+
+  let crack = null;
+  const exploiting = ns.exploit > 0 && ns.expSide === side;
+  if(exploiting){
+    /* One of the free moves has been spent. */
+    ns.exploit--;
+    if(ns.exploit <= 0) ns.expSide = -1;
+  }else if(ns.exploit <= 0){
+    /* Pressure only builds on an ordinary turn. A side driving through
+       a hole is not also leaning on the line somewhere else. */
+    pressureStep(ns, side);
+    crack = applyCracks(ns, side);
+  }
+
+  ns.turn = 1 - side;
+  ns.ply++;
+
+  /* Losses from the crack belong in the same list as losses from the
+     turn, or a whole category of casualty is invisible to anything
+     reading this — which is how the general problem above stayed
+     hidden through three rounds of tuning. */
+  const lost = crackLost(crack).concat(resolve(ns, ns.turn));
+  return {st: ns, kind, from, to, k, lost, side, crack, exploiting};
+}
+
+const crackLost = c => (c && c.lost) ? c.lost : [];
+
+export function legal(s, mv){ return genMoves(s, s.turn).includes(mv); }

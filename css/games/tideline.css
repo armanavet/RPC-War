@@ -1,0 +1,144 @@
+/* ============================================================
+   Tideline — the painted skin.
+
+   A physical board: lacquered wood, felt territories painted on, and
+   moulded tokens with real light on them. Every piece of this is
+   deliberately soft, round and lit, because the game next door is
+   made entirely of hard pixels.
+   ============================================================ */
+
+.sk-painted{
+  background:
+    radial-gradient(120% 100% at 50% 0%, #7A6647 0%, #5E4E37 55%, #4A3D2B 100%);
+  border-radius:6px;
+  box-shadow:
+    inset 0 0 0 2px rgba(30,22,12,.55),
+    inset 0 0 42px rgba(24,17,9,.55),
+    0 10px 26px rgba(40,28,14,.35);
+}
+
+/* --- the ground ---
+   Felt regions. The base is a warm neutral and each terrain lays a
+   flat wash over it; the vignette above does the rest. */
+.sk-painted .cell{
+  background:#C9BB9C;
+  box-shadow:inset 0 0 0 .5px rgba(60,44,22,.14);
+}
+.sk-painted .cell.gr--woods{background:#9FB086}
+.sk-painted .cell.gr--hill{background:#D2BE93}
+.sk-painted .cell.gr--marsh{background:#AFB79B}
+.sk-painted .cell.gr--town{background:#DCCFAF}
+.sk-painted .cell.gr--river,
+.sk-painted .cell.gr--ford{background:#8FB2C9}
+.sk-painted .cell.gr--road{background:#CFC1A0}
+
+.sk-painted .paint{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;
+  fill:none;
+}
+.sk-painted .mo{stroke:none;fill:#5F6B4A;opacity:.5}
+.sk-painted .mo--hill{fill:#9A8354;opacity:.55}
+.sk-painted .mo--town{fill:#8A7350;opacity:.75}
+.sk-painted .mo--marsh{stroke:#5F6B4A;stroke-width:1.6;stroke-linecap:round;fill:none;opacity:.6}
+.sk-painted .mo--water{stroke:#EAF2F6;stroke-width:1.4;fill:none;opacity:.5}
+.sk-painted .mo--stone{fill:#B9AE92;opacity:.9}
+.sk-painted .ln--road{stroke:#B29A6C;stroke-width:5;stroke-linecap:round;fill:none}
+.sk-painted .ln--river{stroke:#6E9AB8;stroke-width:9;stroke-linecap:round;fill:none}
+
+/* --- territory as painted felt ---
+   Ground that has changed hands is a flat, fairly saturated colour,
+   because in this game it is a permanent fact rather than a shifting
+   pressure. */
+.sk-painted .cell::before{
+  z-index:1;
+  mix-blend-mode:multiply;
+  transition:opacity .35s var(--ease);
+}
+/* Kept light on purpose. At full strength the felt covered the board
+   entirely and every wood, hill and river underneath it vanished —
+   which turned a painted map into two flat slabs of colour. The
+   territory is a stain on the board, not a repaint of it. */
+.sk-painted .cell[data-own="b"]::before{background:#5B87C9;opacity:.40}
+.sk-painted .cell[data-own="r"]::before{background:#C4715E;opacity:.40}
+
+/* The tideline is a painted border, thick and slightly soft. */
+.sk-painted{--front:#3B2F1E}
+.sk-painted .cell::after{z-index:3}
+.sk-painted .cell[data-edge*="e"]::after{border-right-width:3px}
+.sk-painted .cell[data-edge*="s"]::after{border-bottom-width:3px}
+
+/* --- the tokens ---
+   A domed disc: bevel from the box-shadow ring, body from a radial
+   gradient offset toward the light, specular highlight from a second
+   smaller gradient, and a real cast shadow underneath. */
+.sk-painted .unit{z-index:4}
+.tok{
+  position:relative;
+  width:78%;height:78%;
+  display:grid;place-items:center;
+  filter:drop-shadow(0 3px 3px rgba(30,20,8,.45));
+}
+.tok__body{
+  position:absolute;inset:0;border-radius:50%;
+  background:
+    radial-gradient(58% 58% at 34% 28%,
+      var(--tok-hi) 0%, var(--tok) 46%, var(--tok-lo) 100%);
+  box-shadow:
+    inset 0 -2px 3px rgba(0,0,0,.35),
+    inset 0 2px 2px rgba(255,255,255,.35),
+    0 0 0 1.5px var(--tok-rim);
+}
+/* the specular — a soft crescent near the top left */
+.tok__body::after{
+  content:'';position:absolute;
+  left:14%;top:9%;width:44%;height:32%;
+  border-radius:50%;
+  background:radial-gradient(closest-side, rgba(255,255,255,.72), rgba(255,255,255,0));
+}
+.tok--b{--tok:#3F6FBE; --tok-hi:#9CBDEB; --tok-lo:#22406F; --tok-rim:#1B3358}
+.tok--r{--tok:#C0503C; --tok-hi:#EFA694; --tok-lo:#7A2B1D; --tok-rim:#5E2015}
+
+/* The emblem is struck into the token: a dark impression with a light
+   edge below it, which is what makes it read as pressed rather than
+   printed. */
+/* The artwork carries fill="currentColor", so it is coloured through
+   `color`; setting `fill` here would be overridden and silently
+   render everything black. */
+.tok__em{
+  position:relative;width:58%;height:58%;
+  color:rgba(255,255,255,.92);
+  filter:drop-shadow(0 -1px 0 rgba(0,0,0,.45)) drop-shadow(0 1px 0 rgba(255,255,255,.3));
+  opacity:.92;
+}
+
+.sk-painted .unit--cut .tok{filter:drop-shadow(0 2px 2px rgba(30,20,8,.4)) saturate(.4)}
+.sk-painted .unit--sel .tok{filter:drop-shadow(0 0 6px rgba(255,232,140,.95)) drop-shadow(0 3px 3px rgba(30,20,8,.45))}
+
+/* --- marks --- */
+.sk-painted .mark{z-index:5}
+.sk-painted .mark--sel{box-shadow:inset 0 0 0 3px #F0D97A}
+.sk-painted .mark--last{box-shadow:inset 0 0 0 2px rgba(240,217,122,.55)}
+.sk-painted .mark .dot{
+  width:22%;height:22%;border-radius:50%;
+  background:radial-gradient(closest-side, #FFF6D2, #E8CE7C);
+  box-shadow:0 1px 2px rgba(0,0,0,.4);
+  opacity:.95;
+}
+.sk-painted .mark--pending::before{
+  inset:20%;border:2px dashed rgba(255,246,210,.85);border-radius:50%;
+}
+.sk-painted .obj__ring{
+  inset:9%;border:2.5px solid #E8CE7C;
+  box-shadow:0 0 0 1.5px rgba(60,44,22,.5), inset 0 0 6px rgba(232,206,124,.5);
+}
+.sk-painted .obj__val{
+  background:#E8CE7C;color:#3B2F1E;
+  box-shadow:0 1px 2px rgba(0,0,0,.35);
+}
+
+/* the rail key uses the same tokens */
+.sk-painted-key .key__ctr{width:24px;height:24px}
+.sk-painted-key .tok{width:100%;height:100%;filter:none}
+.sk-painted-key .buy__ctr .tok{width:100%;height:100%;filter:none}
+.buy__ctr{display:grid;place-items:center}

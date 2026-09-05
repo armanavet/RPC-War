@@ -1,0 +1,97 @@
+/* ============================================================
+   Breakthrough — the flat skin.
+
+   Four inks on paper. No gradient, no shadow, no texture, no bevel
+   anywhere on this board: if something needs to read as in front of
+   something else it does it with colour, not with light.
+   ============================================================ */
+
+.sk-flat{
+  --ink:#1F2A38;
+  --paper:#EFE7D6;
+  --paper-2:#E2D7C0;
+  --brick:#C4553C;
+  --navy:#2F5C8C;
+  --mustard:#D89A2E;
+  --olive:#7A8555;
+
+  background:var(--paper);
+  border-radius:0;
+  box-shadow:0 0 0 3px var(--ink);
+}
+
+.sk-flat .cell{
+  background:var(--paper);
+  box-shadow:inset -1px -1px 0 rgba(31,42,56,.10);
+}
+.sk-flat .cell.fg--woods{background:#CFD6B4}
+.sk-flat .cell.fg--hill{background:#E4D3AC}
+.sk-flat .cell.fg--marsh{background:#CBD3C2}
+.sk-flat .cell.fg--town{background:var(--paper-2)}
+.sk-flat .cell.fg--river,
+.sk-flat .cell.fg--ford{background:#BBD0DC}
+.sk-flat .cell.fg--road{background:#E6DCC6}
+
+.sk-flat .flat{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;fill:none;
+}
+.sk-flat .g1{fill:var(--olive);opacity:.55}
+.sk-flat .cell.fg--hill .g1{fill:#C7A96E;opacity:.6}
+.sk-flat .cell.fg--town .g1{fill:var(--ink);opacity:.42}
+.sk-flat .g2{fill:#8FA08A;opacity:.7}
+.sk-flat .g3{fill:var(--paper-2);opacity:.95}
+.sk-flat .ln--road{stroke:#C9B992;stroke-width:6;fill:none}
+.sk-flat .ln--water{stroke:#7FA7BD;stroke-width:10;fill:none}
+
+/* Territory: one flat block of ink at one strength. Deliberately not
+   a ramp — a continuous opacity ramp is a gradient by another name,
+   and this skin does not have gradients in it. */
+.sk-flat .cell::before{z-index:1;transition:none}
+.sk-flat .cell[data-own="b"]::before{background:var(--navy);opacity:.26}
+.sk-flat .cell[data-own="r"]::before{background:var(--brick);opacity:.26}
+
+.sk-flat{--front:#1F2A38}
+.sk-flat .cell::after{z-index:3}
+.sk-flat .cell[data-edge*="e"]::after{border-right-width:3px}
+.sk-flat .cell[data-edge*="s"]::after{border-bottom-width:3px}
+
+/* --- units: solid silhouettes, in profile --- */
+.sk-flat .unit{z-index:4}
+.fl{width:84%;height:84%}
+.fl--b{color:var(--navy)}
+.fl--r{color:var(--brick)}
+.sk-flat .unit--dim .fl{opacity:.3}
+.sk-flat .unit--cut .fl{color:var(--ink);opacity:.45}
+
+/* --- marks --- */
+.sk-flat .mark{z-index:5}
+.sk-flat .mark--sel{box-shadow:inset 0 0 0 3px var(--mustard)}
+.sk-flat .mark--last{box-shadow:inset 0 0 0 3px rgba(216,154,46,.45)}
+.sk-flat .mark .dot{
+  width:26%;height:26%;border-radius:0;
+  background:var(--mustard);opacity:1;box-shadow:none;
+  transform:rotate(45deg);
+}
+.sk-flat .obj__ring{
+  inset:14%;border-radius:0;border:3px solid var(--mustard);box-shadow:none;
+}
+.sk-flat .obj__val{
+  background:var(--mustard);color:var(--ink);border-radius:0;box-shadow:none;
+  font-weight:700;
+}
+
+/* --- pressure: chunky printed bars, the loudest thing on the board
+   after the units, because reading them is the defender's whole game --- */
+.sk-flat .press{
+  left:4%;bottom:4%;width:20%;height:70%;
+  border-radius:0;opacity:1;
+  box-shadow:inset 0 0 0 2px var(--ink);
+  background:
+    linear-gradient(to top,
+      var(--mustard) 0, var(--mustard) calc(var(--p) * 25%),
+      transparent calc(var(--p) * 25%), transparent 100%);
+}
+
+.sk-flat-key .key__ctr{width:26px;height:26px}
+.sk-flat-key .fl{width:100%;height:100%}

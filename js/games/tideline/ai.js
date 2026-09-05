@@ -1,0 +1,166 @@
+/* ============================================================
+   The computer player for Tideline.
+
+   Same shape as Salient's — negamax, alpha-beta, iterative
+   deepening, hard forward pruning — but a different idea of what is
+   worth having. Here the score is almost purely ground, because
+   ground is literally the win condition, and units are priced as
+   what they can convert rather than as what they cost.
+
+   The one thing that had to be taught explicitly is that a unit
+   standing on enemy ground dies unless the ground converts. An
+   earlier evaluation was blind to it and the machine walked
+   infantry onto red ground every single turn, losing one a turn for
+   nothing, because the position looked briefly better.
+   ============================================================ */
+import {BLUE, RED, SZ, geo, OBJECTIVES, TYPES, GEN, INF, ARM, ART, MIL,
+        WIN_GROUND, CONVERT_MIN, BREAK,
+        genMoves, apply, controlOf, groundCount, objectivesOwned,
+        countUnits, pending, verdict, TERRAIN_MAP,
+        isPass, isBuild, buildType, buildAt, moveFrom, moveTo, PASS} from './rules.js';
+import {owner} from '../_shared/control.js';
+
+const WIN = 1e6;
+const ABORT = {};
+let _nodes = 0, _deadline = Infinity;
+
+const VALUE = [];
+VALUE[GEN] = 900; VALUE[INF] = 105; VALUE[ARM] = 165; VALUE[ART] = 150; VALUE[MIL] = 70;
+
+const GROUND_W = 26;    // the win condition, so it dominates
+const OBJ_W    = 90;    // objectives buy build points, which buy ground
+const BP_W     = 9;
+
+const OBJ_DIST = OBJECTIVES.map(o => {
+  const d = new Int16Array(SZ);
+  for(let i = 0; i < SZ; i++) d[i] = geo.dist(o, i);
+  return d;
+});
+
+export function evalBlue(s){
+  const f = controlOf(s);
+  let score = 0;
+
+  score += (groundCount(s, BLUE) - groundCount(s, RED)) * GROUND_W;
+  score += (objectivesOwned(s, BLUE) - objectivesOwned(s, RED)) * OBJ_W;
+  score += (s.bp[BLUE] - s.bp[RED]) * BP_W;
+
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k]) continue;
+    const sign = s.side[k] === BLUE ? 1 : -1;
+    score += sign * VALUE[s.type[k]];
+    /* Standing on their ground is a bet: it pays if the square
+       converts this turn and costs the whole unit if it does not. */
+    const i = s.sq[k], me = s.side[k];
+    if(s.own[i] === (1 - me)){
+      const v = me === BLUE ? f[i] : -f[i];
+      if(v < CONVERT_MIN) score -= sign * VALUE[s.type[k]] * 0.8;
+    }
+    const v2 = me === BLUE ? f[i] : -f[i];
+    if(v2 <= -(BREAK - 1)) score -= sign * VALUE[s.type[k]] * 0.6;
+  }
+
+  /* What the next turn would convert, which is the only forward-
+     looking term the evaluation has and the cheapest one available. */
+  let pb = 0, pr = 0;
+  const pB = pending(s, BLUE, f), pR = pending(s, RED, f);
+  for(let i = 0; i < SZ; i++){ pb += pB[i]; pr += pR[i]; }
+  score += (pb - pr) * (GROUND_W * 0.7);
+
+  return score;
+}
+
+function rank(s, moves, side){
+  const f = controlOf(s);
+  const pend = pending(s, side, f);
+  const want = [];
+  for(let m = 0; m < OBJECTIVES.length; m++)
+    if(s.own[OBJECTIVES[m]] !== side) want.push(OBJ_DIST[m]);
+
+  const sc = new Float64Array(moves.length);
+  for(let k = 0; k < moves.length; k++){
+    const mv = moves[k];
+    if(isPass(mv)){ sc[k] = -1e9; continue; }
+    if(isBuild(mv)){
+      const i = buildAt(mv);
+      /* build where the line is, not where it is quiet */
+      let heat = 0;
+      for(const j of geo.N8[i]) if(s.own[j] !== side) heat++;
+      sc[k] = 55 + heat * 20 + (buildType(mv) === ARM ? 8 : 0);
+      continue;
+    }
+    const from = moveFrom(mv), to = moveTo(mv);
+    let v = 0;
+    let pull = 0;
+    for(const d of want) pull = Math.max(pull, (d[from] - d[to]) * 24 - d[to] * 2);
+    v = pull;
+    if(s.own[to] !== side) v += 35;              // going forward
+    if(s.own[to] === (1 - side)) v += 25;        // an actual assault
+    if(pend[to]) v += 40;                        // ground that will convert
+    sc[k] = v;
+  }
+  const idx = new Array(moves.length);
+  for(let k = 0; k < moves.length; k++) idx[k] = k;
+  idx.sort((a, b) => sc[b] - sc[a]);
+  const out = new Array(moves.length);
+  for(let k = 0; k < moves.length; k++) out[k] = moves[idx[k]];
+  return out;
+}
+
+const WIDTH = [1, 6, 10, 14, 18, 22];
+const widthAt = d => WIDTH[Math.min(d, WIDTH.length - 1)];
+
+function negamax(s, depth, alpha, beta){
+  if((++_nodes & 127) === 0 && Date.now() > _deadline) throw ABORT;
+  const side = s.turn;
+  const v = verdict(s, side);
+  if(v) return v.w === -1 ? 0 : (v.w === side ? WIN + depth : -(WIN + depth));
+  if(depth <= 0) return (side === BLUE ? 1 : -1) * evalBlue(s);
+
+  const all = rank(s, genMoves(s, side), side);
+  const width = Math.min(all.length, widthAt(depth));
+  let best = -Infinity;
+  for(let i = 0; i < width; i++){
+    const r = apply(s, all[i]);
+    const sc = -negamax(r.st, depth - 1, -beta, -alpha);
+    if(sc > best) best = sc;
+    if(best > alpha) alpha = best;
+    if(alpha >= beta) break;
+  }
+  return best === -Infinity ? 0 : best;
+}
+
+export function bestMove(s, depth, sloppy){
+  const side = s.turn;
+  const all = genMoves(s, side);
+  if(!all.length) return PASS;
+  if(all.length === 1) return all[0];
+  const moves = rank(s, all, side);
+  if(sloppy && Math.random() < 0.18)
+    return moves[(Math.random() * Math.min(8, moves.length)) | 0];
+
+  const width = Math.min(moves.length, 26);
+  let best = -Infinity, cand = [], alpha = -Infinity;
+  for(let i = 0; i < width; i++){
+    const r = apply(s, moves[i]);
+    const sc = -negamax(r.st, depth - 1, -Infinity, -alpha);
+    if(sc > best + 1e-9){ best = sc; cand = [moves[i]]; alpha = Math.max(alpha, sc); }
+    else if(sc > best - 1e-9) cand.push(moves[i]);
+  }
+  return cand[(Math.random() * cand.length) | 0];
+}
+
+export function bestMoveTimed(s, maxDepth, budgetMs, sloppy){
+  let best = null;
+  _nodes = 0; _deadline = Date.now() + budgetMs;
+  try{
+    for(let d = 2; d <= maxDepth; d++){
+      const m = bestMove(s, d, sloppy);
+      if(m != null) best = m;
+      if(Date.now() > _deadline) break;
+    }
+  }catch(e){ if(e !== ABORT){ _deadline = Infinity; throw e; } }
+  _deadline = Infinity;
+  return best != null ? best : bestMove(s, 2, sloppy);
+}
+export const nodes = () => _nodes;

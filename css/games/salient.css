@@ -1,0 +1,79 @@
+/* ============================================================
+   Salient — rendered counters on an operations map.
+
+   Layout comes from wargame.css. Everything here is look. The board
+   is a raster tileset, the counters are pre-rendered enamel badges
+   with baked lighting, and the whole thing is cool and hard-edged —
+   as unlike the painted board next door as a photograph is unlike a
+   watercolour.
+   ============================================================ */
+
+.sk-map{
+  background:#93A56A;
+  border-radius:4px;
+  box-shadow:
+    inset 0 0 0 2px #262B1C,
+    inset 0 0 50px rgba(18,22,12,.45),
+    0 6px 18px rgba(24,28,16,.3);
+}
+
+/* Ground tiles fill their square. Smooth scaling, not pixelated:
+   these are rendered images, not pixel art. */
+.sk-map .px-t{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:0;
+}
+.sk-map .px{
+  width:92%;height:92%;
+  pointer-events:none;
+  filter:drop-shadow(0 2px 2px rgba(10,14,8,.55));
+}
+.sk-map .cell{box-shadow:inset 0 0 0 .5px rgba(20,24,14,.22)}
+
+/* Territory sits above the tileset — a cell's ::before paints under
+   its children, and the ground here is an opaque image. */
+.sk-map .cell::before{
+  z-index:1;
+  transition:opacity .25s var(--ease);
+}
+.sk-map .cell[data-own="b"]::before{background:#3E6FC4}
+.sk-map .cell[data-own="r"]::before{background:#C4453E}
+.sk-map .cell[data-own="b"]::before,
+.sk-map .cell[data-own="r"]::before{opacity:calc(0.12 + var(--ctl,0) * 0.38)}
+
+/* The front: a hard rule in the tileset's own outline colour. */
+.sk-map{--front:#1B2012}
+.sk-map .cell::after{z-index:2}
+.sk-map .cell[data-edge*="e"]::after{border-right-width:3px}
+.sk-map .cell[data-edge*="s"]::after{border-bottom-width:3px}
+
+/* Objectives: a surveyor's marker, not a ring. */
+.sk-map .mark{z-index:3}
+.sk-map .obj__ring{
+  inset:auto;left:5%;top:4%;width:0;height:44%;
+  border:none;border-radius:0;box-shadow:none;
+  border-left:3px solid #F0C24A;
+}
+.sk-map .obj__val{
+  right:auto;left:calc(5% + 3px);top:4%;bottom:auto;
+  background:#F0C24A;color:#20240F;
+  border-radius:0 3px 3px 0;box-shadow:0 1px 2px rgba(0,0,0,.4);
+  font:700 9px/1 var(--font-mono);padding:2px 3px;
+}
+
+.sk-map .mark--sel{box-shadow:inset 0 0 0 3px #F5E07A}
+.sk-map .mark--last{box-shadow:inset 0 0 0 2px rgba(245,224,122,.45)}
+.sk-map .mark .dot{
+  width:26%;height:26%;border-radius:50%;
+  background:#F5E07A;opacity:.95;
+  box-shadow:0 0 0 2px rgba(20,24,14,.65);
+}
+.sk-map .mark--danger{box-shadow:inset 0 0 0 3px #E2503E}
+.sk-map .unit{z-index:4}
+.sk-map .unit--dim .px{filter:grayscale(.9) brightness(.7)}
+.sk-map .unit--cut .px{filter:brightness(.72) saturate(.5) drop-shadow(0 2px 2px rgba(10,14,8,.55))}
+.sk-map .unit--sel .px{filter:drop-shadow(0 0 5px rgba(245,224,122,.95)) drop-shadow(0 2px 2px rgba(10,14,8,.5))}
+
+/* the rail key */
+.sk-map-key .key__ctr{width:26px;height:26px}
+.sk-map-key .key__ctr img{width:100%;height:100%}

@@ -30,10 +30,7 @@
       <span class="brand__name">Oddboards</span>
     </a>
 
-    <nav class="nav" aria-label="Main">
-      <a href="./" aria-current="page">Games</a>
-      <a href="leaderboard/">Leaderboard</a>
-    </nav>
+    <nav class="nav" aria-label="Main"><a href="./">Games</a><a href="./wargames/">War games</a><a href="./leaderboard/">Leaderboard</a></nav>
 
     <div class="topbar__end">
       <button class="chipbtn" id="navProfile">
@@ -49,7 +46,7 @@
 
     <section class="hero">
       <h1 class="hero__t display">Odd little games for two.</h1>
-      <p class="hero__s">Two originals you can learn in half a minute and finish in five.
+      <p class="hero__s">Originals you can learn in half a minute and finish in five.
         Play the computer, or send a friend a link — no account, no install.</p>
       <div class="hero__meta">
         <span class="live live--total" id="liveTotal" hidden></span>
@@ -69,7 +66,14 @@
     <div class="games-hd">
       <h2 class="h-games display">The games</h2>
     </div>
-    <div class="grid" id="gameGrid"></div>
+    <div class="grid" id="gameGrid" data-kind="quick"></div>
+
+    <a class="crossover" href="wargames/">
+      <div class="crossover__t display">And four wargames</div>
+      <p class="crossover__s">Front lines, sieges and supply. Heavier games that take
+        an evening rather than a coffee break.</p>
+      <span class="crossover__go">Open the war games &rarr;</span>
+    </a>
 
     <div class="adslot" data-ad="home"></div>
 

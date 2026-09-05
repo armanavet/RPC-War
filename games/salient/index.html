@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="manifest" href="../../manifest.webmanifest">
+<link rel="icon" href="../../img/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../img/icon-180.png">
+<title>Salient — Oddboards</title>
+<meta name="description" content="A wargame of front lines. Take ground by surrounding it, not by landing on it.">
+<link rel="stylesheet" href="../../css/tokens.css">
+<link rel="stylesheet" href="../../css/base.css">
+<link rel="stylesheet" href="../../css/games/wargame.css">
+<link rel="stylesheet" href="../../css/games/salient.css">
+<link rel="stylesheet" href="../../css/ads.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar__in">
+    <a class="brand" href="../../">
+      <svg class="brand__mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="22" height="22" rx="6" fill="var(--surface-2)" stroke="var(--line-2)" stroke-width="1.3"/>
+        <circle cx="9.5" cy="10" r="4.6" fill="var(--accent)"/>
+        <circle cx="15" cy="14.5" r="4.6" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.3"/>
+      </svg>
+      <span class="brand__name">Oddboards</span>
+    </a>
+    <nav class="nav" aria-label="Main"><a href="../../">Games</a><a href="../../wargames/">War games</a><a href="../../leaderboard/">Leaderboard</a></nav>
+    <div class="topbar__end">
+      <button class="btn btn--sm btn--ghost" id="btnRules">Rules</button>
+      <button class="chipbtn" id="navProfile">
+        <span class="avatar avatar--sm" id="navAvatar"></span>
+        <span id="navName">Sign in</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="stack">
+  <div class="wrap game">
+
+    <div class="game__hd">
+      <h1 class="display game__title">Salient</h1>
+      <span class="live" id="liveHere" hidden></span>
+    </div>
+
+    <div class="game__layout">
+      <div class="boardcol">
+
+        <div class="pbar pbar--r" id="pbarTop">
+          <span class="avatar avatar--sm" id="pTopAvatar">?</span>
+          <span class="pbar__name" id="pTopName">Computer</span>
+          <span class="pbar__meta side-r">Red</span>
+          <span class="vp">
+            <span class="vp__inc" id="vpIncR">+0</span>
+            <span class="vp__bar"><span class="vp__fill" id="vpFillR"></span></span>
+            <span class="vp__n tnum" id="vpNR">0 / 520</span>
+          </span>
+        </div>
+
+        <div class="boardbox">
+          <div class="board" id="board"></div>
+          <div class="over" id="over">
+            <div class="over__big display" id="overBig">Blue wins</div>
+            <div class="over__why" id="overWhy"></div>
+            <div class="over__actions">
+              <button class="btn btn--primary" id="overNew">New game</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pbar pbar--b" id="pbarBot">
+          <span class="avatar avatar--sm" id="pBotAvatar">?</span>
+          <span class="pbar__name" id="pBotName">You</span>
+          <span class="pbar__meta side-b">Blue</span>
+          <span class="vp">
+            <span class="vp__inc" id="vpIncB">+0</span>
+            <span class="vp__bar"><span class="vp__fill" id="vpFillB"></span></span>
+            <span class="vp__n tnum" id="vpNB">0 / 520</span>
+          </span>
+        </div>
+
+        <div class="statusbar">
+          <span class="dot b" id="turnDot"></span>
+          <span class="statusbar__turn" id="turnTxt">Blue to move</span>
+          <span class="tnum">turn <b id="ply">1</b></span>
+          <span class="chip" id="poolChip" hidden></span>
+          <span class="chip" id="cutChip" hidden></span>
+          <span class="statusbar__hint" id="hint"></span>
+        </div>
+      </div>
+
+      <aside class="rail">
+        <section class="panel">
+          <div class="panel__hd"><h2 class="eyebrow">Game</h2></div>
+          <div class="panel__bd">
+            <div class="row row--gap">
+              <button class="btn btn--primary" id="btnNew">New game</button>
+              <button class="btn btn--ghost" id="btnUndo">Undo</button>
+            </div>
+            <hr class="hr rail__hr">
+            <label class="check">
+              <input type="checkbox" id="aiOn" checked>
+              <span>Computer plays <b class="side-r">Red</b></span>
+            </label>
+            <select class="field" id="level" aria-label="Difficulty" style="margin-top:10px">
+              <option value="1">Easy</option>
+              <option value="2" selected>Normal</option>
+              <option value="3">Hard</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__hd"><h2 class="eyebrow">Counters</h2></div>
+          <div class="panel__bd"><div class="key" id="key"></div></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel__hd"><h2 class="eyebrow">Orders</h2></div>
+          <div class="panel__bd panel__bd--tight"><div class="log" id="log"></div></div>
+        </section>
+
+        <div class="adslot" data-ad="game"></div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__in">
+    <a href="../../">Oddboards</a>
+    <button class="linkbtn" id="btnRules2">Rules</button>
+    <a href="../../privacy/">Privacy</a>
+  </div>
+</footer>
+
+<div class="modal" id="rulesModal">
+  <div class="modal__box modal__box--wide">
+    <div class="modal__hd">
+      <div class="modal__title">Salient</div>
+      <button class="iconbtn" id="rulesClose" aria-label="Close">&#10005;</button>
+    </div>
+    <ul class="rules__list">
+      <li><b>Ground belongs to whoever projects more force onto it.</b> Every
+        unit pushes force outwards, falling off with distance. Add both sides
+        up on a square and the larger number owns it. The line between the
+        two colours is the front — nobody draws it, it is just where the
+        numbers cross.</li>
+      <li><b>You take a unit by surrounding it, not by landing on it.</b> A
+        unit that cannot trace a path home through ground the enemy does not
+        hold is cut off. Two turns later it surrenders. A unit that is simply
+        out-gunned where it stands breaks at once.</li>
+      <li><b>You may only move units inside your command.</b> Your general
+        and your two staff officers each carry orders a certain distance.
+        Everything outside those circles sits still. Killing a staff officer
+        puts a whole wing to sleep.</li>
+      <li><b>One unit per turn.</b> That is the whole turn.</li>
+      <li><b>Score the five towns.</b> At the start of your turn you bank a
+        point for each objective you control — the crossroads counts three.
+        First to 520 wins. Lose your general and you lose immediately.</li>
+      <li><b>Engineers dig and bridge.</b> An engineer can entrench where it
+        stands, or throw a bridge across a river square beside it.</li>
+      <li><b>Replacements</b> arrive every five turns and can be placed on any
+        baseline square you still hold.</li>
+    </ul>
+    <p class="rules__credit">Unit and terrain artwork from
+      <a href="https://game-icons.net" rel="noopener">Game Icons</a> by Lorc,
+      Delapouite and contributors, used under
+      <a href="https://creativecommons.org/licenses/by/3.0/" rel="noopener">CC BY 3.0</a>.</p>
+  </div>
+</div>
+
+<script type="module" src="../../js/games/salient/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "oddboards-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev-time tooling only. The site itself is static files with no build step and no runtime dependencies — nothing in here is served.",
+  "scripts": {
+    "art": "node tools/build-art.mjs",
+    "cards": "node tools/make-wargame-cards.mjs",
+    "sync": "python3 tools/sync-rules.py"
+  },
+  "devDependencies": {
+    "@iconify-json/game-icons": "^1.2.4",
+    "playwright": "^1.49.0",
+    "sharp": "^0.33.0"
+  }
+}

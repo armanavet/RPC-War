@@ -46,12 +46,18 @@ function renderProfile(){
   }
 }
 
-/* ---------- game grid ---------- */
+/* ---------- game grid ----------
+   Catalogue paths are written relative to the site root, so a page
+   that is not at the root has to say so. The wargames index lives one
+   directory down and every card link and every card image on it
+   resolved into a directory that does not exist until this existed. */
+let BASE = '';
+
 function card(g){
-  return `<a class="gcard" href="${g.href}">
+  return `<a class="gcard" href="${BASE}${g.href}">
     <div class="gcard__art">
-      <img class="gcard__img" src="img/cards/${g.slug}.webp?v=${ART_V}"
-           srcset="img/cards/${g.slug}.webp?v=${ART_V} 1x, img/cards/${g.slug}@2x.webp?v=${ART_V} 2x"
+      <img class="gcard__img" src="${BASE}img/cards/${g.slug}.webp?v=${ART_V}"
+           srcset="${BASE}img/cards/${g.slug}.webp?v=${ART_V} 1x, ${BASE}img/cards/${g.slug}@2x.webp?v=${ART_V} 2x"
            width="640" height="272" loading="lazy" decoding="async" alt="">
     </div>
     <div class="gcard__bd">
@@ -66,7 +72,14 @@ function card(g){
   </a>`;
 }
 
-const renderGames = () => { $('gameGrid').innerHTML = GAMES.map(card).join(''); };
+/* One script, two pages. The grid element says which kind of game it
+   wants; everything else on the two pages is identical. */
+const renderGames = () => {
+  const el = $('gameGrid');
+  BASE = el.dataset.base || '';
+  const kind = el.dataset.kind || 'quick';
+  el.innerHTML = GAMES.filter(g => (g.kind || 'quick') === kind).map(card).join('');
+};
 
 /* ---------- who is around ---------- */
 /* Nobody needs to be told a game has nobody in it, so a zero hides

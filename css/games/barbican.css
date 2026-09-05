@@ -1,0 +1,144 @@
+/* ============================================================
+   Barbican — the woodcut skin.
+
+   Ink on parchment. Nothing here is lit, nothing is filled with a
+   gradient, and nothing has a soft edge: depth comes from hatching
+   and from line weight, the way it does in a print.
+   ============================================================ */
+
+.sk-woodcut{
+  --ink:#2A1F14;
+  --ink-2:#5A4630;
+  --parch:#E9DCBE;
+  --parch-2:#DCCCA6;
+  --gules:#9E2B22;      /* the garrison */
+  --azure:#274C7A;      /* the besieger */
+  --gold:#B4832C;
+
+  background:var(--parch);
+  border-radius:2px;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 0 0 1px var(--parch-2),
+    inset 0 0 60px rgba(90,70,40,.30);
+}
+
+/* Parchment grain: two very fine repeating gradients, which is as
+   close to a printed tooth as CSS gets without an image. */
+.sk-woodcut::before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:6;
+  background:
+    repeating-linear-gradient(0deg, rgba(90,70,40,.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(90,70,40,.04) 0 1px, transparent 1px 4px);
+  mix-blend-mode:multiply;
+}
+
+.sk-woodcut .cell{
+  background:transparent;
+  box-shadow:inset 0 0 0 .5px rgba(42,31,20,.10);
+}
+.sk-woodcut .cell.pg--woods,
+.sk-woodcut .cell.pg--marsh{background:rgba(122,132,86,.13)}
+.sk-woodcut .cell.pg--hill{background:rgba(180,131,44,.11)}
+.sk-woodcut .cell.pg--river,
+.sk-woodcut .cell.pg--ford{background:rgba(39,76,122,.13)}
+.sk-woodcut .cell.pg--town{background:rgba(90,70,48,.10)}
+
+.sk-woodcut .cut{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;z-index:2;overflow:visible;
+}
+.sk-woodcut .ln{
+  fill:none;stroke:var(--ink);stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+.sk-woodcut .ln--w{stroke:#3C6288;stroke-width:1.3}
+.sk-woodcut .ln--road{stroke:var(--ink-2);stroke-width:2.4;stroke-dasharray:3.5 3}
+/* Masonry is drawn twice: a solid parchment ground so it stands out
+   of whatever the cell is tinted, then the coursing pattern over it. */
+.sk-woodcut .base{fill:#EFE6D0;stroke:none}
+.sk-woodcut .stone{fill:url(#wc-stone);stroke:var(--ink);stroke-width:1.8}
+
+/* The castle is the loudest thing on the parchment. */
+.sk-woodcut .cell.pg--wall,
+.sk-woodcut .cell.pg--tower,
+.sk-woodcut .cell.pg--gate,
+.sk-woodcut .cell.pg--keep{background:var(--parch-2)}
+.sk-woodcut .cell.pg--rubble{background:rgba(42,31,20,.07)}
+
+/* Territory: not a colour wash — a wash would be paint, and this is a
+   print. Ground held by one side gets a sparse dotted ground tone in
+   that side's tincture instead. */
+/* `background-image` alone does not clear the flat colour the shared
+   stylesheet sets for an owned cell, so the dots were being painted
+   on top of an opaque slab and the entire castle disappeared under
+   two blocks of poster paint. The colour has to be cleared by hand. */
+.sk-woodcut .cell::before{
+  z-index:1;opacity:1 !important;
+  background-color:transparent !important;
+  background-repeat:repeat;
+}
+.sk-woodcut .cell[data-own="b"]::before{
+  background-image:radial-gradient(circle at 1.5px 1.5px, rgba(39,76,122,.5) 1.1px, transparent 1.2px);
+  background-size:5px 5px;
+}
+.sk-woodcut .cell[data-own="r"]::before{
+  background-image:radial-gradient(circle at 1.5px 1.5px, rgba(158,43,34,.5) 1.1px, transparent 1.2px);
+  background-size:5px 5px;
+}
+.sk-woodcut .cell[data-own="x"]::before{background:none}
+
+.sk-woodcut{--front:#2A1F14}
+.sk-woodcut .cell::after{z-index:3}
+.sk-woodcut .cell[data-edge*="e"]::after{border-right-width:2px}
+.sk-woodcut .cell[data-edge*="s"]::after{border-bottom-width:2px}
+
+/* --- the shields --- */
+.sk-woodcut .unit{z-index:5}
+.wc{width:82%;height:82%;overflow:visible}
+.wc__field{fill:var(--sh)}
+.wc__hatch{stroke:none}
+.wc__edge{fill:none;stroke:var(--ink);stroke-width:22}
+/* The artwork is filled, not stroked, and takes its colour through
+   `color` because every path in it is fill="currentColor". */
+.wc__charge{color:var(--parch)}
+.wc--b{--sh:var(--azure)}
+.wc--r{--sh:var(--gules)}
+.sk-woodcut .unit--cut .wc{opacity:.5}
+.sk-woodcut .unit--dim .wc{opacity:.4}
+
+/* --- marks --- */
+.sk-woodcut .mark{z-index:4}
+.sk-woodcut .mark--sel{box-shadow:inset 0 0 0 2.5px var(--gold)}
+.sk-woodcut .mark--last{box-shadow:inset 0 0 0 2px rgba(180,131,44,.5)}
+.sk-woodcut .mark .dot{
+  width:0;height:0;border-radius:0;background:none;box-shadow:none;
+  border-left:5px solid transparent;border-right:5px solid transparent;
+  border-bottom:8px solid var(--gold);
+}
+.sk-woodcut .mark--danger{box-shadow:inset 0 0 0 2.5px var(--gules)}
+.sk-woodcut .obj__ring{display:none}
+.sk-woodcut .obj__val{display:none}
+
+/* the rail key */
+.sk-woodcut-key .key__ctr{width:24px;height:26px}
+.sk-woodcut-key .wc{width:100%;height:100%}
+
+/* Masonry wear. Damage shows on the stone before it falls, because a
+   wall that is about to come down is the single most important thing
+   on the board for both players. */
+.sk-woodcut .cell[data-wear="1"] .stone{opacity:.7}
+.sk-woodcut .cell[data-wear="1"]::before{
+  content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:
+    linear-gradient(28deg, transparent 46%, rgba(42,31,20,.55) 47%, transparent 48%),
+    linear-gradient(-40deg, transparent 62%, rgba(42,31,20,.45) 63%, transparent 64%);
+}
+.sk-woodcut .cell[data-wear="2"] .stone{opacity:.45}
+.sk-woodcut .cell[data-wear="2"]::before{
+  content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:
+    linear-gradient(28deg, transparent 34%, rgba(42,31,20,.7) 36%, transparent 38%),
+    linear-gradient(-40deg, transparent 52%, rgba(42,31,20,.6) 54%, transparent 56%),
+    linear-gradient(70deg, transparent 68%, rgba(42,31,20,.5) 70%, transparent 72%);
+}

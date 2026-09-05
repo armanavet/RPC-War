@@ -78,7 +78,11 @@ const BOT_DOMAIN = '@bots.oddboards.invalid';
 
 console.log(`seeding ${COUNT} bots into ${URL_}${RESET ? ' (resetting first)' : ''}`);
 
-const GAMES = ['rps-chess', 'anvil'];
+/* Every game that wants a bot pool. Re-running the seeder after
+   adding one here gives the new game its own opponents and its own
+   populated ladder; bots are per-game, so a Salient bot never turns
+   up in an Anvil queue. */
+const GAMES = ['rps-chess', 'anvil', 'salient', 'tideline', 'breakthrough', 'barbican'];
 
 /* Names are combined from pools rather than listed, so a hundred of
    them do not need a hundred lines. Mixed conventions on purpose: a

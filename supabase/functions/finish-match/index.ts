@@ -19,6 +19,10 @@
 import {createClient} from 'jsr:@supabase/supabase-js@2';
 import * as rps from '../_shared/rps-chess-rules.js';
 import * as anvil from '../_shared/anvil-rules.js';
+import * as salient from '../_shared/salient-rules.js';
+import * as tideline from '../_shared/tideline-rules.js';
+import * as breakthrough from '../_shared/breakthrough-rules.js';
+import * as barbican from '../_shared/barbican-rules.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -95,9 +99,51 @@ function replayAnvil(moves: number[]): Replay {
   return {kind: 'unfinished'};
 }
 
+/* ---------- the control-field games ----------
+   Salient, Tideline and Breakthrough all keep a whole game state in
+   one object and expose the same three functions, so one replay does
+   for all three. That is not a coincidence — it is the reason their
+   rules modules were written to the same shape.
+
+   `verdict` is asked *after* each move, for the side about to move,
+   exactly as the browser asks it, because in all three games a side's
+   casualties and score are settled at the start of its own turn. */
+type Engine = {
+  startState: () => any;
+  genMoves: (s: any, side: number) => number[];
+  apply: (s: any, mv: number) => {st: any};
+  verdict: (s: any, side: number) => {w: number; why: string} | null;
+  BLUE: number;
+};
+
+function replayField(eng: Engine){
+  return (moves: number[]): Replay => {
+    let s = eng.startState();
+    for(let i = 0; i < moves.length; i++){
+      const mv = moves[i];
+      if(!eng.genMoves(s, s.turn).includes(mv)) return {kind: 'illegal', index: i};
+      s = eng.apply(s, mv).st;
+      const v = eng.verdict(s, s.turn);
+      if(v){
+        if(i !== moves.length - 1) return {kind: 'illegal', index: i + 1};
+        return {
+          kind: 'over',
+          result: v.w === -1 ? 'draw' : (v.w === eng.BLUE ? 'blue' : 'red'),
+          reason: v.why,
+        };
+      }
+    }
+    return {kind: 'unfinished'};
+  };
+}
+
 const VERIFIERS: Record<string, (m: number[]) => Replay> = {
   'rps-chess': replayRps,
   'anvil': replayAnvil,
+  'salient': replayField(salient as unknown as Engine),
+  'tideline': replayField(tideline as unknown as Engine),
+  'breakthrough': replayField(breakthrough as unknown as Engine),
+  'barbican': replayField(barbican as unknown as Engine),
 };
 
 Deno.serve(async (req) => {

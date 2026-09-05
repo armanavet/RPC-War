@@ -1,0 +1,272 @@
+/* ============================================================
+   Salient. Class names that land on JS-generated nodes
+   (.cell, .mark, .unit, .ctr, .terr) are a contract with
+   js/games/_shared/board.js.
+
+   The board is the only thing on this page doing any real work, so
+   almost everything below is about one question: can you see where
+   the front is without being told? Terrain is drawn faint, counters
+   are drawn hard, and the control shading sits between them.
+   ============================================================ */
+
+.game{padding:22px 0 0}
+.game__hd{margin-bottom:14px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.game__title{font-size:22px}
+
+.game__layout{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 300px;
+  gap:22px;
+  align-items:start;
+}
+
+:root{--front:#4A3B24}
+:root[data-theme="dark"]{--front:#E8DCC4}
+
+.side-b{color:var(--blue-hi)}
+.side-r{color:var(--red-hi)}
+
+/* ---------- player bars ---------- */
+.pbar{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  transition:background var(--fast);
+}
+.pbar--turn{background:var(--accent-tint)}
+.pbar__name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbar__meta{font-size:12.5px;color:var(--text-3);white-space:nowrap;flex:none}
+#pbarTop{border-radius:var(--r) var(--r) 0 0;border-bottom:0}
+#pbarBot{border-radius:0 0 var(--r) var(--r);border-top:0}
+
+/* The scoreboard is the game's clock: it is always moving and it is
+   the thing you lose to, so it sits on the player bars rather than
+   somewhere in the rail. */
+.vp{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.vp__bar{width:110px;height:7px;border-radius:4px;background:var(--surface-3);overflow:hidden}
+.vp__fill{height:100%;width:0;transition:width .3s var(--ease)}
+.pbar--b .vp__fill{background:var(--blue)}
+.pbar--r .vp__fill{background:var(--red)}
+.vp__n{font-size:12.5px;color:var(--text-2);min-width:62px;text-align:right}
+.vp__inc{font-size:11.5px;color:var(--text-3)}
+
+/* ---------- board ---------- */
+.boardbox{
+  position:relative;
+  background:linear-gradient(180deg, var(--surface-2), var(--surface-3));
+  border-left:1px solid var(--line);
+  border-right:1px solid var(--line);
+  padding:10px;
+}
+.board{
+  position:relative;width:100%;
+  aspect-ratio:var(--cols) / var(--rows);
+  overflow:hidden;
+  background:var(--board-lite);
+  border-radius:3px;
+  box-shadow:inset 0 0 0 1px rgba(72,54,28,.16), inset 0 2px 12px rgba(72,54,28,.10);
+  touch-action:none;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  cursor:pointer;
+}
+
+.cells,.marks{
+  position:absolute;inset:0;display:grid;
+  grid-template-columns:repeat(var(--cols),1fr);
+  grid-template-rows:repeat(var(--rows),1fr);
+}
+.marks{pointer-events:none}
+
+.cell{
+  position:relative;
+  box-shadow:inset 0 0 0 .5px rgba(72,54,28,.07);
+}
+
+/* --- control shading ---
+   One flat wash per cell, its opacity carrying the strength of the
+   hold. Two washes were tried — a gradient toward the front — and it
+   made the map look like weather rather than territory. */
+.cell::before{
+  content:'';position:absolute;inset:0;
+  opacity:var(--ctl,0);
+  transition:opacity .25s var(--ease), background-color .25s var(--ease);
+  background:transparent;
+}
+.cell[data-own="b"]::before{background:var(--blue)}
+.cell[data-own="r"]::before{background:var(--red)}
+/* No-man's-land is left as bare map. Tinting it a third colour made
+   three territories where the game only has two. */
+.cell[data-own="x"]::before{background:none;opacity:0}
+
+/* --- the front line ---
+   Drawn edge by edge between cells whose owner differs. This is the
+   whole visual thesis of the game and it is four lines of CSS. */
+/* The front is drawn as a hard, dark edge so it reads through the
+   tint at any zoom. It is deliberately the strongest line on the
+   board — heavier than the grid, heavier than any terrain. */
+.cell::after{
+  content:'';position:absolute;inset:-1px;pointer-events:none;
+  border-right:0 solid var(--front);
+  border-bottom:0 solid var(--front);
+  z-index:2;
+}
+.cell[data-edge*="e"]::after{border-right-width:2.5px}
+.cell[data-edge*="s"]::after{border-bottom-width:2.5px}
+
+/* --- terrain --- */
+.terr{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.terr--road{stroke:var(--line-2);opacity:.85}
+.terr--river{stroke:#5B86B8;opacity:.75}
+.terr--ford{stroke:#5B86B8;opacity:.6}
+.terr--woods{stroke:#5C7A4E;fill:none;stroke-width:1.7;opacity:.72}
+.terr--hill{stroke:var(--line-2);stroke-width:1.7;fill:none;opacity:.95}
+.terr--marsh{stroke:#7A8B6A;opacity:.7}
+.terr--town{stroke:var(--text-3);stroke-width:1.6;fill:var(--surface);opacity:.9}
+.cell[data-terr="town"]{box-shadow:inset 0 0 0 1px rgba(72,54,28,.22)}
+.cell[data-terr="hill"]{background:rgba(200,180,140,.28)}
+.cell[data-terr="woods"]{background:rgba(120,150,100,.16)}
+.cell[data-terr="marsh"]{background:rgba(130,150,120,.13)}
+.cell[data-terr="river"]{background:rgba(110,155,205,.22)}
+
+/* --- marks layer --- */
+.mark{position:relative;display:grid;place-items:center}
+/* Command is shown on the counters that have it, not on the ground —
+   see ui.js. */
+.mark--sel{box-shadow:inset 0 0 0 2.5px var(--accent)}
+.mark--last{box-shadow:inset 0 0 0 2px var(--accent-ring)}
+.mark--from{background:var(--accent-tint)}
+.mark--danger{box-shadow:inset 0 0 0 2px var(--bad)}
+.mark .dot{
+  width:26%;height:26%;border-radius:50%;
+  background:var(--accent);opacity:.75;
+  box-shadow:0 0 0 2px var(--surface);
+}
+.mark--to{cursor:pointer}
+
+/* Objectives. The loudest permanent thing on the map, because they
+   are the only thing you actually win with. */
+.obj{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:1}
+.obj__ring{
+  position:absolute;inset:6%;border-radius:50%;
+  border:2.5px solid var(--even);
+  box-shadow:0 0 0 2px color-mix(in srgb, var(--surface) 70%, transparent);
+}
+.obj__val{
+  font:700 10px/1 var(--font-ui);color:var(--surface);
+  position:absolute;right:4%;bottom:4%;
+  background:var(--even);border-radius:3px;padding:2px 3.5px;
+  box-shadow:0 0 0 1.5px color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+/* --- counters --- */
+.units{position:absolute;inset:0;pointer-events:none}
+.unit{
+  position:absolute;
+  width:calc(100% / var(--cols));
+  height:calc(100% / var(--rows));
+  transform:translate(calc(var(--x) * 100%), calc(var(--y) * 100%));
+  transition:transform .24s var(--ease), opacity .2s linear;
+  display:grid;place-items:center;
+  will-change:transform;
+}
+.unit .ctr{width:82%;height:82%;filter:drop-shadow(0 1px 1px rgba(72,54,28,.35))}
+.unit--b{color:var(--blue-hi);--ctr-fill:#FFFCF6}
+.unit--r{color:var(--red-hi); --ctr-fill:#FFFCF6}
+:root[data-theme="dark"] .unit--b{--ctr-fill:rgba(34,29,23,.94)}
+:root[data-theme="dark"] .unit--r{--ctr-fill:rgba(34,29,23,.94)}
+.unit--cut .ctr{opacity:.72}
+/* out of command: present, but plainly not available */
+.unit--dim .ctr{opacity:.42;filter:grayscale(.55)}
+.unit--sel .ctr{filter:drop-shadow(0 0 0 2px var(--accent)) drop-shadow(0 2px 3px rgba(72,54,28,.4))}
+.unit--gone{opacity:0;transform:translate(calc(var(--x) * 100%), calc(var(--y) * 100%)) scale(.6)}
+
+/* ---------- status ---------- */
+.statusbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 2px 0;font-size:13px;color:var(--text-2);
+}
+.statusbar__turn{font-weight:600;color:var(--text)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.dot.b{background:var(--blue)} .dot.r{background:var(--red)}
+.statusbar__hint{margin-left:auto;color:var(--text-3)}
+.chip{
+  font-size:11.5px;padding:2px 7px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-2);
+}
+
+/* ---------- the key ---------- */
+.key{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}
+.key__row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-2)}
+.key__ctr{width:26px;height:19px;flex:none;color:var(--text-2)}
+.key__ctr .ctr{width:100%;height:100%;--ctr-fill:var(--surface)}
+
+/* ---------- overlay ---------- */
+.over{
+  position:absolute;inset:10px;display:none;place-content:center;text-align:center;
+  background:color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter:blur(2px);border-radius:3px;
+}
+.over--on{display:grid}
+.over__big{font-size:26px;margin-bottom:4px}
+.over__why{color:var(--text-2);margin-bottom:14px}
+.over__actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+/* ---------- narrow ---------- */
+@media (max-width:1100px){
+  .game__layout{grid-template-columns:1fr;gap:16px}
+  .rail{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;align-items:start}
+}
+@media (max-width:720px){
+  .board{border-radius:2px}
+  .unit .ctr{width:94%;height:94%}
+  .obj__val{display:none}
+  .vp__bar{width:64px}
+}
+
+/* ---------- Tideline: ground that has actually changed hands ---------- */
+.mark--pending::before{
+  content:'';position:absolute;inset:26%;border-radius:2px;
+  border:2px dashed var(--accent);opacity:.85;
+}
+
+/* ---------- Breakthrough: pressure on the enemy line ----------
+   Four rungs, filling upward. The whole defensive game is reading
+   these, so they are drawn as a gauge rather than as a colour: a
+   player has to be able to count them, not just feel them. */
+.press{
+  position:absolute;left:6%;bottom:6%;width:22%;height:64%;
+  display:block;
+  background:
+    linear-gradient(to top,
+      var(--even) 0, var(--even) calc(var(--p) * 25%),
+      transparent calc(var(--p) * 25%), transparent 100%);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--even) 55%, transparent);
+  border-radius:2px;
+  opacity:.9;
+}
+.mark--press{}
+
+/* ---------- the build shop (Tideline) ---------- */
+.shop{display:grid;gap:6px}
+.buy{
+  display:flex;align-items:center;gap:9px;width:100%;
+  padding:6px 9px;border-radius:var(--r-sm);
+  border:1px solid var(--line);background:var(--surface);
+  color:var(--text);font:inherit;font-size:13px;cursor:pointer;
+  transition:background var(--fast), border-color var(--fast);
+}
+.buy:hover:not(:disabled){background:var(--surface-2)}
+.buy--on{border-color:var(--accent);background:var(--accent-tint)}
+.buy:disabled{opacity:.45;cursor:default}
+.buy__ctr{width:26px;height:19px;flex:none;color:var(--text-2)}
+.buy__ctr .ctr{width:100%;height:100%;--ctr-fill:var(--surface)}
+.buy__n{flex:1;text-align:left}
+.buy__c{color:var(--text-3);font-size:12px}
+.key__note{grid-column:1/-1;font-size:11.5px;color:var(--text-3);margin-top:2px}
+.rules__credit{
+  margin:14px 0 0;padding-top:12px;
+  border-top:1px solid var(--line);
+  font-size:12px;color:var(--text-3);
+}
+.rules__credit a{color:var(--text-2)}

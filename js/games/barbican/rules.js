@@ -1,0 +1,430 @@
+/* ============================================================
+   Barbican — the rules, and nothing else.
+
+   Pure functions: no DOM, no network. The edge functions import this
+   file to verify finished games and play the bots.
+
+   THE IDEA — AND WHY IT IS NOT SYMMETRICAL
+
+   The other three games are duels: same army, same goal, mirrored
+   map. This one is a siege, and a siege is not a duel. The two sides
+   want different things, own different things and lose in different
+   ways.
+
+     The BESIEGER has nineteen men, engines, and no time. He wins by
+     standing in the keep — physically, with a man, not by
+     out-shooting it from the fields. Every turn he does not is a turn
+     his camp gets sicker.
+
+     The GARRISON has nine, a wall to stand on, and only has to still
+     be there when the relief column arrives. He wins by running out
+     the clock.
+
+   That asymmetry is the whole game. The besieger must spend; the
+   garrison must not be spent.
+
+   WHY THE KEEP MUST BE OCCUPIED
+
+   Every other game here is won by controlling ground, and control is
+   the sum of force projected onto it. If this game were won that way
+   the besieger could simply park his army outside the walls and
+   out-project a keep he had never set foot in, and the castle would
+   be decoration. So the keep is taken by standing in it and surviving
+   a reply. Walls stop men; they are deliberately not modelled as
+   stopping force, because bombardment does drop into a courtyard and
+   because line of sight in the search would cost more than it is
+   worth.
+
+   ENCODING
+
+   Squares 0..194 on a board 15 wide and 13 high, index 0 top-left.
+   The castle is in the north; the besieger camps in the south.
+   A move packs as from * 195 + to. A "move" onto a wall or gate
+   square that the mover cannot enter is a siege attack on it — ram,
+   mine or bombardment — which is unambiguous because entering it
+   would otherwise be illegal.
+   ============================================================ */
+import {makeGeo, field, reachable, zoneOfControl, TERRAIN,
+        OPEN, WOODS, HILL, TOWN, RIVER, FORD, ROAD, MARSH,
+        WALL, TOWER, GATE, RUBBLE, KEEP, owner} from '../_shared/control.js';
+
+export const W = 15, H = 13;
+export const geo = makeGeo(W, H);
+export const SZ = geo.SZ;
+export const BESIEGER = 0, GARRISON = 1;
+export const BLUE = BESIEGER, RED = GARRISON;      // the engine's names
+export const {rowOf, colOf, at, sq, dist} = geo;
+
+/* ---------- units ----------
+   The two rosters have nothing in common, which is the point. Type
+   ids are shared across both sides only so the arrays stay flat. */
+export const CAPTAIN = 0, LEVY = 1, SERJEANT = 2, RAM = 3, TREB = 4,
+             LADDER = 5, MINER = 6,
+             CASTELLAN = 7, ARCHER = 8, GUARD = 9, KNIGHT = 10;
+
+export const TYPES = [
+  /* The levy used to be strength two, which meant it projected two
+     onto its own square and one onto its neighbours — so eight of
+     them surrounding a guard on open ground produced eight, exactly
+     what the guard produced on his own, and the besieger's entire
+     numerical advantage came to nothing. An army that cannot win a
+     fight in the courtyard has no reason to enter it, and it did
+     not: four test games ended with the walls in rubble and nobody
+     inside. */
+  {key:'captain',   name:'Captain',    side:BESIEGER, str:5, hole:0, mp:6,  hold:3},
+  {key:'levy',      name:'Levy',       side:BESIEGER, str:3, hole:0, mp:4,  hold:2},
+  {key:'serjeant',  name:'Serjeant',   side:BESIEGER, str:4, hole:0, mp:4,  hold:3},
+  {key:'ram',       name:'Ram',        side:BESIEGER, str:1, hole:0, mp:2,  hold:1},
+  {key:'trebuchet', name:'Trebuchet',  side:BESIEGER, str:2, hole:3, mp:2,  hold:0},
+  {key:'ladder',    name:'Ladders',    side:BESIEGER, str:1, hole:0, mp:4,  hold:1},
+  {key:'miner',     name:'Miner',      side:BESIEGER, str:1, hole:0, mp:3,  hold:1},
+
+  /* The garrison's strength is meant to be the wall, not the man.
+     With a personal hold of four apiece they were nearly unkillable
+     standing in an open courtyard too, so a breach led nowhere and
+     the besieger — correctly — never went through one. The terrain
+     still gives them three on a wall and four in a tower; in the open
+     they are simply good soldiers, and nineteen men can swamp them. */
+  {key:'castellan', name:'Castellan',  side:GARRISON, str:5, hole:0, mp:4,  hold:3},
+  {key:'archer',    name:'Archer',     side:GARRISON, str:3, hole:1, mp:3,  hold:2},
+  {key:'guard',     name:'Guard',      side:GARRISON, str:4, hole:0, mp:3,  hold:3},
+  {key:'knight',    name:'Knight',     side:GARRISON, str:4, hole:0, mp:8,  hold:3},
+];
+
+/* ---------- the castle ---------- */
+export const KEEP_SQ = at(3, 7);
+export const GATE_SQ = at(6, 7);
+
+const TOWERS = [at(1,4), at(1,10), at(6,4), at(6,10)];
+
+function buildTerrain(){
+  const t = new Uint8Array(SZ).fill(OPEN);
+  const put = (k, l) => { for(const i of l) t[i] = k; };
+
+  /* open country, with a road running up to the gate */
+  for(let r = 7; r <= 12; r++) t[at(r, 7)] = ROAD;
+  for(let c = 0; c < W; c++) t[at(11, c)] = ROAD;
+  put(WOODS, [at(9,1),at(9,2),at(8,13),at(9,13),at(12,4),at(12,11)]);
+  put(HILL,  [at(8,4),at(8,10),at(10,0),at(10,14)]);
+  put(MARSH, [at(7,1),at(7,13)]);
+  for(const c of [0,1,2,12,13,14]) t[at(4,c)] = c < 7 ? WOODS : WOODS;
+
+  /* the curtain wall */
+  for(let c = 4; c <= 10; c++){ t[at(1,c)] = WALL; t[at(6,c)] = WALL; }
+  for(let r = 1; r <= 6; r++){  t[at(r,4)] = WALL; t[at(r,10)] = WALL; }
+  put(TOWER, TOWERS);
+  t[GATE_SQ] = GATE;
+  t[KEEP_SQ] = KEEP;
+  return t;
+}
+export const TERRAIN_MAP = buildTerrain();
+
+export const isWallKind = k => k === WALL || k === TOWER || k === GATE;
+
+/* ---------- dials ---------- */
+export const HP = {[WALL]: 8, [TOWER]: 13, [GATE]: 10};
+export const RAM_DMG   = 3;
+export const MINE_DMG  = 2;
+export const TREB_DMG  = 2;
+export const TREB_MIN  = 3, TREB_MAX = 7;
+export const ESCALADE_COST = 4;
+
+export const BREAK        = 5;    // local superiority that shatters a unit
+export const HOLD_PLIES   = 2;    // how long the keep must be held
+/* The camp used to take a man every eight turns, which over a
+   two-hundred-ply game killed thirteen of nineteen besiegers on its
+   own — the clock was not pressure, it was the whole result. It is
+   now a real cost that still leaves an army to assault with. */
+export const MIN_BESIEGER = 3;    // fewer than this and the siege is lifted
+export const ATTRITION_EVERY = 14;
+export const PLY_CAP      = 240;  // the relief column
+
+export const PASS = SZ * SZ;
+export const packMove = (from, to) => from * SZ + to;
+export const moveFrom = mv => (mv / SZ) | 0;
+export const moveTo   = mv => mv % SZ;
+export const isPass   = mv => mv === PASS;
+
+/* ---------- opening position ---------- */
+const BESIEGE_SETUP = [
+  [CAPTAIN, at(12,7)],
+  [TREB, at(12,3)], [TREB, at(12,11)],
+  [RAM,  at(11,7)],
+  [LADDER, at(11,5)], [LADDER, at(11,9)],
+  [MINER, at(12,5)],
+  [SERJEANT, at(10,5)], [SERJEANT, at(10,9)], [SERJEANT, at(11,3)], [SERJEANT, at(11,11)],
+  [LEVY, at(10,2)], [LEVY, at(10,4)], [LEVY, at(10,6)], [LEVY, at(10,8)],
+  [LEVY, at(10,10)], [LEVY, at(10,12)], [LEVY, at(11,1)], [LEVY, at(11,13)],
+];
+const GARRISON_SETUP = [
+  [CASTELLAN, at(3,6)],
+  [ARCHER, at(1,5)], [ARCHER, at(1,9)], [ARCHER, at(6,5)], [ARCHER, at(6,9)],
+  [GUARD, at(5,7)], [GUARD, at(2,5)], [GUARD, at(2,9)],
+  [KNIGHT, at(4,8)],
+];
+
+export function startState(){
+  const n = BESIEGE_SETUP.length + GARRISON_SETUP.length;
+  const s = {
+    n,
+    sq: new Int16Array(n), side: new Uint8Array(n), type: new Uint8Array(n),
+    live: new Uint8Array(n),
+    ter: TERRAIN_MAP.slice(),
+    hp: new Uint8Array(SZ),
+    turn: BESIEGER, ply: 0,
+    turns: [0, 0],
+    lodged: -1,          // ply the besieger first stood in the keep
+    lost: 0,             // besiegers lost to the camp
+  };
+  for(let i = 0; i < SZ; i++) if(HP[s.ter[i]]) s.hp[i] = HP[s.ter[i]];
+
+  let k = 0;
+  for(const [t, i] of BESIEGE_SETUP){
+    s.sq[k] = i; s.side[k] = BESIEGER; s.type[k] = t; s.live[k] = 1; k++;
+  }
+  for(const [t, i] of GARRISON_SETUP){
+    s.sq[k] = i; s.side[k] = GARRISON; s.type[k] = t; s.live[k] = 1; k++;
+  }
+  return s;
+}
+
+export function clone(s){
+  return {
+    n: s.n,
+    sq: s.sq.slice(), side: s.side.slice(), type: s.type.slice(),
+    live: s.live.slice(), ter: s.ter.slice(), hp: s.hp.slice(),
+    turn: s.turn, ply: s.ply, turns: [s.turns[0], s.turns[1]],
+    lodged: s.lodged, lost: s.lost,
+  };
+}
+
+/* ---------- the field ---------- */
+const _view = {n: 0};
+export function viewOf(s){
+  if(_view.n !== s.n){
+    _view.n = s.n;
+    _view.sq = new Int16Array(s.n); _view.side = new Uint8Array(s.n);
+    _view.str = new Int16Array(s.n); _view.hole = new Uint8Array(s.n);
+    _view.live = new Uint8Array(s.n); _view.hold = new Int16Array(s.n);
+  }
+  for(let k = 0; k < s.n; k++){
+    const t = TYPES[s.type[k]];
+    _view.sq[k] = s.sq[k]; _view.side[k] = s.side[k]; _view.live[k] = s.live[k];
+    _view.hole[k] = t.hole; _view.str[k] = t.str; _view.hold[k] = t.hold;
+  }
+  return _view;
+}
+
+const _field = new Int16Array(SZ);
+let _fieldFor = null;
+export function controlOf(s){
+  if(_fieldFor === s) return _field;
+  field(geo, viewOf(s), s.ter, _field, null);
+  _fieldFor = s;
+  return _field;
+}
+export function soil(s){ if(_fieldFor === s) _fieldFor = null; }
+
+export function countUnits(s, side){
+  let n = 0;
+  for(let k = 0; k < s.n; k++) if(s.live[k] && s.side[k] === side) n++;
+  return n;
+}
+export function unitAt(s, i){
+  for(let k = 0; k < s.n; k++) if(s.live[k] && s.sq[k] === i) return k;
+  return -1;
+}
+export function inKeep(s, side){
+  const k = unitAt(s, KEEP_SQ);
+  return k >= 0 && s.side[k] === side;
+}
+
+/* Wall squares a besieger may climb: those with a ladder party
+   standing beside them. Rubble needs no ladder; a tower is too high
+   for one. */
+const _esc = new Uint8Array(SZ);
+export function escalade(s){
+  _esc.fill(0);
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== BESIEGER || s.type[k] !== LADDER) continue;
+    for(const j of geo.N4[s.sq[k]])
+      if(s.ter[j] === WALL || s.ter[j] === GATE) _esc[j] = 1;
+  }
+  return _esc;
+}
+
+/* What this unit can bombard, ram or mine, and for how much. */
+export function siegeTargets(s, k){
+  const out = [];
+  if(s.side[k] !== BESIEGER) return out;
+  const t = s.type[k], from = s.sq[k];
+  if(t === RAM){
+    for(const j of geo.N4[from]) if(s.ter[j] === GATE) out.push([j, RAM_DMG]);
+  }else if(t === MINER){
+    for(const j of geo.N4[from]) if(s.ter[j] === WALL || s.ter[j] === TOWER) out.push([j, MINE_DMG]);
+  }else if(t === TREB){
+    for(let j = 0; j < SZ; j++){
+      if(!isWallKind(s.ter[j])) continue;
+      const d = dist(from, j);
+      if(d >= TREB_MIN && d <= TREB_MAX) out.push([j, TREB_DMG]);
+    }
+  }
+  return out;
+}
+
+/* ---------- moves ---------- */
+const _blocked = new Uint8Array(SZ);
+const _zoc = new Uint8Array(SZ);
+const _reach = new Int16Array(SZ);
+const _ter = new Uint8Array(SZ);
+
+export function genMoves(s, side){
+  const out = [];
+  const esc = side === BESIEGER ? escalade(s) : null;
+
+  _blocked.fill(0);
+  for(let k = 0; k < s.n; k++) if(s.live[k]) _blocked[s.sq[k]] = 1;
+
+  /* The besieger cannot walk onto the wall. He can climb one a ladder
+     party is holding, at a price, and he can walk over rubble for
+     nothing — which is what all the engines are for. */
+  _ter.set(s.ter);
+  if(side === BESIEGER){
+    for(let i = 0; i < SZ; i++){
+      const k = s.ter[i];
+      if(k === TOWER){ _blocked[i] = 1; continue; }
+      if(k === WALL || k === GATE){
+        if(esc[i]) _ter[i] = RUBBLE;              // scalable, but slow
+        else _blocked[i] = 1;
+      }
+    }
+  }
+  zoneOfControl(geo, viewOf(s), side, _zoc);
+
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== side) continue;
+    const t = TYPES[s.type[k]];
+    const from = s.sq[k];
+
+    _blocked[from] = 0;
+    const mp = (side === BESIEGER && esc) ? t.mp : t.mp;
+    const best = reachable(geo, from, mp, _ter, _blocked, _zoc, _reach);
+    _blocked[from] = 1;
+    for(let j = 0; j < SZ; j++) if(best[j] >= 0) out.push(packMove(from, j));
+
+    /* Siege work is encoded as a move onto the thing being attacked.
+       It can never collide with a real move, because a square you may
+       enter is never a square you may batter. */
+    for(const [j] of siegeTargets(s, k)) out.push(packMove(from, j));
+  }
+  if(!out.length) out.push(PASS);
+  return out;
+}
+
+export function siegeDamage(s, from, to){
+  const k = unitAt(s, from);
+  if(k < 0) return 0;
+  for(const [j, d] of siegeTargets(s, k)) if(j === to) return d;
+  return 0;
+}
+
+/* ---------- resolution ---------- */
+export function resolve(s, side){
+  const f = controlOf(s);
+  const lost = [];
+  for(let k = 0; k < s.n; k++){
+    if(!s.live[k] || s.side[k] !== side) continue;
+    const v = side === BESIEGER ? f[s.sq[k]] : -f[s.sq[k]];
+    if(v <= -BREAK){ s.live[k] = 0; lost.push({k, sq: s.sq[k], why: 'cut down'}); }
+  }
+  if(lost.length) soil(s);
+  return lost;
+}
+
+/* The camp. Every so often the besieger loses a man to nothing at
+   all, which is what actually ended most sieges. Deterministic — the
+   highest-numbered levy still standing, then the man furthest from
+   the castle — because the edge function replays this. */
+export function attrition(s){
+  let pick = -1;
+  for(let k = s.n - 1; k >= 0; k--)
+    if(s.live[k] && s.side[k] === BESIEGER && s.type[k] === LEVY){ pick = k; break; }
+  if(pick < 0){
+    let far = -1;
+    for(let k = 0; k < s.n; k++){
+      if(!s.live[k] || s.side[k] !== BESIEGER) continue;
+      if(s.type[k] === CAPTAIN) continue;
+      const d = dist(s.sq[k], KEEP_SQ);
+      if(d > far){ far = d; pick = k; }
+    }
+  }
+  if(pick < 0) return null;
+  s.live[pick] = 0; s.lost++;
+  soil(s);
+  return {k: pick, sq: s.sq[pick], why: 'lost to the camp'};
+}
+
+export function wallsStanding(s){
+  let n = 0;
+  for(let i = 0; i < SZ; i++) if(isWallKind(s.ter[i])) n++;
+  return n;
+}
+export function breaches(s){
+  let n = 0;
+  for(let i = 0; i < SZ; i++) if(s.ter[i] === RUBBLE) n++;
+  return n;
+}
+
+export function verdict(s, side){
+  if(countUnits(s, BESIEGER) <= MIN_BESIEGER)
+    return {w: GARRISON, why: 'the siege was lifted'};
+  if(countUnits(s, GARRISON) === 0 && inKeep(s, BESIEGER))
+    return {w: BESIEGER, why: 'the castle fell'};
+  /* A banner in the keep has to survive a reply. */
+  if(s.lodged >= 0 && s.ply > s.lodged + HOLD_PLIES && inKeep(s, BESIEGER))
+    return {w: BESIEGER, why: 'the keep was taken'};
+  if(s.ply >= PLY_CAP)
+    return {w: GARRISON, why: 'the relief column arrived'};
+  return null;
+}
+
+/* ---------- apply ---------- */
+export function apply(s, mv){
+  const ns = clone(s);
+  const side = s.turn;
+  let from = -1, to = -1, kind = 'pass', k = -1, dmg = 0, broke = false;
+
+  if(!isPass(mv)){
+    from = moveFrom(mv); to = moveTo(mv);
+    k = unitAt(ns, from);
+    if(k < 0) return {st: ns, kind: 'void', from, to, lost: [], side};
+
+    dmg = siegeDamage(ns, from, to);
+    if(dmg > 0){
+      kind = ns.type[k] === RAM ? 'ram' : ns.type[k] === MINER ? 'mine' : 'shot';
+      ns.hp[to] = Math.max(0, ns.hp[to] - dmg);
+      if(ns.hp[to] === 0){ ns.ter[to] = RUBBLE; broke = true; kind = 'breach'; }
+    }else{
+      ns.sq[k] = to; kind = 'move';
+    }
+    soil(ns);
+  }
+
+  /* A banner planted in the keep starts its clock; leaving stops it. */
+  if(inKeep(ns, BESIEGER)){ if(ns.lodged < 0) ns.lodged = ns.ply; }
+  else ns.lodged = -1;
+
+  ns.turn = 1 - side;
+  ns.ply++;
+  ns.turns[ns.turn]++;
+
+  const lost = resolve(ns, ns.turn);
+  let camp = null;
+  if(ns.turn === BESIEGER && ns.turns[BESIEGER] % ATTRITION_EVERY === 0){
+    camp = attrition(ns);
+    if(camp) lost.push(camp);
+  }
+  return {st: ns, kind, from, to, k, dmg, broke, lost, camp, side};
+}
+
+export function legal(s, mv){ return genMoves(s, s.turn).includes(mv); }

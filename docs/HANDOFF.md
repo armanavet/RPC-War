@@ -8,10 +8,28 @@ design of the backend.
 
 ## 1. What it is
 
-A site for two-player board games — "chess.com for odd little games". One game
-exists: **RPS Chess** (9×9, every piece moves like a king, captures are settled
-with rock-paper-scissors). Static files, no build step, ES modules, deployed on
-GitHub Pages at <https://oddboards.com>. Backend is Supabase.
+A site for two-player board games — "chess.com for odd little games". Static
+files, no build step, ES modules, deployed on GitHub Pages at
+<https://oddboards.com>. Backend is Supabase.
+
+Five games:
+
+| game | what it is | length |
+|---|---|---|
+| **RPS Chess** | 9×9, every piece moves like a king, captures settled with rock-paper-scissors | 5 min |
+| **Anvil** | 6×6, hold the middle four squares, you move people by shoving them | 7 min |
+| **Salient** | 19×11 wargame — take a unit by surrounding it; your general's radius limits what you can order | 20 min |
+| **Tideline** | 17×11 wargame — ground you take stays taken, and your army cannot outrun its territory | 25 min |
+| **Breakthrough** | 15×13 wargame — mass pressure until a sector cracks, then pour armour through | 25 min |
+| **Barbican** | 15×13 **asymmetric** siege — nineteen men and a clock against nine men and a wall | 30 min |
+
+The last four share one engine and are documented separately in
+[wargames.md](wargames.md). Read that before touching any of them.
+
+The site is split in two: the homepage carries the quick games, `/wargames/`
+carries the heavy ones, and `kind` in `js/site/catalog.js` decides which. Both
+pages run the same `js/site/home.js`; the grid element carries `data-kind` and,
+for any page not at the site root, `data-base`.
 
 Repo: `armanavet/RPC-War`. Branch `main`.
 
@@ -30,6 +48,8 @@ Repo: `armanavet/RPC-War`. Branch `main`.
 | Matchmaking + leaderboard | done, live |
 | Match history / player pages | done, live |
 | Online counts (site + per game) | **written, 0010 not applied** |
+| The four wargames, local + vs computer | done |
+| The four wargames, online | **not built — no sync.js** |
 
 ### Applied on the live project
 
@@ -39,6 +59,23 @@ Repo: `armanavet/RPC-War`. Branch `main`.
 
 ```
 supabase/migrations/0010_presence.sql
+```
+
+Migrations `0011`–`0015` have not been verified against the live project
+either — `0015_wargames.sql` is new with the wargames and only widens the
+synthetic online counter to five rooms. Nothing else about the three new
+games needs a migration at all: `matches.game`, `ratings.game`, `queue.game`
+and `bots.game` are plain `text` with no check constraint, so a new slug
+works the moment the client asks for it.
+
+After deploying the wargames, both edge functions must be redeployed and the
+bot seeder re-run:
+
+```bash
+python tools/sync-rules.py
+npx supabase functions deploy finish-match
+npx supabase functions deploy bot-move
+node tools/seed-bots.mjs        # GAMES now lists all five
 ```
 
 Until it is, the online counters simply stay hidden — `presence.js` swallows
@@ -87,7 +124,14 @@ tools/    serve.py · sync-rules.py
 
 **Adding a game:** create `js/games/<slug>/`, `css/games/<slug>.css`,
 `games/<slug>/index.html`, then add an entry to `js/site/catalog.js`. `js/net/`
-is reusable as-is; a new game only needs its own `sync.js`.
+is reusable as-is; a new game only needs its own `sync.js`. Add the slug to
+`tools/sync-rules.py`, to `VERIFIERS` in `finish-match`, to `ENGINES` in
+`bot-move`, and to `GAMES` in `tools/seed-bots.mjs`.
+
+A wargame is cheaper than that: `js/games/_shared/` already has the control
+field, the counters and the board renderer, so a fourth one needs `rules.js`,
+`ai.js` and the four thin modules around them. See
+[wargames.md](wargames.md).
 
 ## 5. Invariants — do not break these
 

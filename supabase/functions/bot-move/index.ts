@@ -26,6 +26,14 @@ import * as rpsRules from '../_shared/rps-chess-rules.js';
 import * as rpsAi from '../_shared/rps-chess-ai.js';
 import * as anvilRules from '../_shared/anvil-rules.js';
 import * as anvilAi from '../_shared/anvil-ai.js';
+import * as salRules from '../_shared/salient-rules.js';
+import * as salAi from '../_shared/salient-ai.js';
+import * as tideRules from '../_shared/tideline-rules.js';
+import * as tideAi from '../_shared/tideline-ai.js';
+import * as brkRules from '../_shared/breakthrough-rules.js';
+import * as brkAi from '../_shared/breakthrough-ai.js';
+import * as barRules from '../_shared/barbican-rules.js';
+import * as barAi from '../_shared/barbican-ai.js';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -37,14 +45,35 @@ const json = (body: unknown, status = 200) =>
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+/* The two board games hand round a plain array; the three wargames
+   hand round a state object. `bd` is therefore whatever that game
+   calls a position — it is only ever passed straight back in. */
 type Engine = {
-  start: () => number[];
-  legal: (bd: number[], turn: number) => number[];
-  apply: (bd: number[], mv: number) => number[];
-  best: (bd: number[], turn: number, depth: number, budget: number) => number | undefined;
+  start: () => any;
+  legal: (bd: any, turn: number) => number[];
+  apply: (bd: any, mv: number) => any;
+  best: (bd: any, turn: number, depth: number, budget: number) => number | undefined;
   /* how far ahead the side to move is, for the resign decision */
-  edge: (bd: number[], turn: number) => number;
+  edge: (bd: any, turn: number) => number;
+  /* whose turn a position says it is, where the position knows */
+  turn?: (bd: any) => number;
 };
+
+/* One adapter for all three control-field games: same module shape,
+   same state object, different rules inside. */
+function fieldEngine(R: any, A: any, weight: number): Engine {
+  return {
+    start: () => R.startState(),
+    legal: (s) => R.genMoves(s, s.turn),
+    apply: (s, mv) => R.apply(s, mv).st,
+    best:  (s, _t, d, ms) => A.bestMoveTimed(s, d, ms, false),
+    turn:  (s) => s.turn,
+    edge:  (s) => {
+      const me = R.countUnits(s, s.turn), them = R.countUnits(s, 1 - s.turn);
+      return (me - them) * weight;
+    },
+  };
+}
 
 const ENGINES: Record<string, Engine> = {
   'rps-chess': {
@@ -67,6 +96,9 @@ const ENGINES: Record<string, Engine> = {
       return (me - them) * 150;
     },
   },
+  salient:      fieldEngine(salRules,  salAi,  130),
+  tideline:     fieldEngine(tideRules, tideAi, 130),
+  breakthrough: fieldEngine(brkRules,  brkAi,  130),
 };
 
 /* Log-normal-ish think time. Never a constant, never instant, but never
@@ -142,6 +174,11 @@ Deno.serve(async (req) => {
   let bd = eng.start();
   let turn = 0;
   for(const mv of (job.moves || [])){ bd = eng.apply(bd, mv); turn = 1 - turn; }
+  /* Games that carry a turn in their own state are the authority on
+     it; parity is only a fallback for the two that do not. Both
+     agree, because every game on the site alternates strictly — see
+     the note in breakthrough/rules.js about why that matters. */
+  if(eng.turn) turn = eng.turn(bd);
   if(turn !== job.seat) return json({ok: true});           // raced with a real move
 
   const legal = eng.legal(bd, turn);
