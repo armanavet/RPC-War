@@ -1,15 +1,12 @@
 /* ============================================================
-   Shared wargame layout — Salient, Tideline, Breakthrough and
-   Barbican all load this, then exactly one skin stylesheet on top.
+   Salient. Class names that land on JS-generated nodes
+   (.cell, .mark, .unit, .ctr, .terr) are a contract with
+   js/games/_shared/board.js.
 
-   This file owns STRUCTURE only: the board grid, the counter
-   positioning, the player bars, the rail and the status line. It
-   owns no colours, no textures and no piece art, because the four
-   games are meant to look nothing like each other and anything
-   opinionated here would have to be fought by three of them.
-
-   Class names that land on JS-generated nodes (.cell, .mark, .unit)
-   are a contract with js/games/_shared/board.js.
+   The board is the only thing on this page doing any real work, so
+   almost everything below is about one question: can you see where
+   the front is without being told? Terrain is drawn faint, counters
+   are drawn hard, and the control shading sits between them.
    ============================================================ */
 
 .game{padding:22px 0 0}
@@ -273,3 +270,27 @@
   font-size:12px;color:var(--text-3);
 }
 .rules__credit a{color:var(--text-2)}
+
+/* ---------- the rules modal ----------
+   These live in each of the older games' own stylesheets, so the four
+   wargames inherited a rules panel with no styling at all: an
+   unindented list in a narrow column with no header row. Shared here
+   because all four use the same markup, and the wargames need a wider
+   box than a five-minute game does — there is more to explain. */
+.modal__box--wide{max-width:520px}
+.modal__hd{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.modal__hd .modal__title{flex:1}
+.iconbtn{
+  width:28px;height:28px;flex:none;
+  display:grid;place-items:center;
+  border:0;border-radius:var(--r-sm);
+  background:transparent;color:var(--text-3);
+  font-size:13px;cursor:pointer;
+}
+.iconbtn:hover{background:var(--surface-2);color:var(--text)}
+.rules__list{
+  margin:0;padding-left:18px;
+  font-size:14px;color:var(--text-2);line-height:1.68;
+}
+.rules__list li + li{margin-top:9px}
+.rules__list b{color:var(--text)}
